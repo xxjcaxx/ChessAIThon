@@ -1,0 +1,18 @@
+.dynamic-grid {
+  height: auto !important; /* Permite que el grid se adapte */
+}
+
+.dynamic-tile {
+  display: flex;
+  align-items: stretch; /* Hace que el tile crezca según el contenido */
+  height: auto !important; /* Asegura que la altura se ajuste */
+}
+
+.tile-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  padding: 10px;
+}

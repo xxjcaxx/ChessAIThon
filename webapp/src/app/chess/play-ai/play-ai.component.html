@@ -1,0 +1,71 @@
+<div class="container">
+  <div class="col">
+    <app-board style="width: 100%" [board]="scenario.fen" [name]="'origin'"></app-board>
+
+    <p class="scenario_fen">{{scenario.fen}}</p>
+
+
+
+    <mat-card >
+      <mat-card-content>
+        <form [formGroup]="fenForm">
+          <mat-form-field >
+            <mat-label>Set FEN</mat-label>
+            <input matInput placeholder="FEN Notation" formControlName="fen" />
+            <button matSuffix mat-icon-button (click)="setFen()">
+              <mat-icon>settings_backup_restore</mat-icon>
+            </button>
+
+          </mat-form-field>
+        </form>
+        <form [formGroup]="serversForm">
+          <div class="input-container">
+            <!-- Campo 1 con switch -->
+            <mat-form-field >
+              <mat-label>Server White</mat-label>
+              <input matInput placeholder="Server URL" formControlName="serverW" [disabled]="!switchStateW" />
+            </mat-form-field>
+            <mat-slide-toggle formControlName="switchW" (change)="toggleInputW($event.checked)">
+              White AI
+            </mat-slide-toggle>
+
+            <!-- Campo 2 con switch -->
+            <mat-form-field >
+              <mat-label>Server Black</mat-label>
+              <input matInput placeholder="Server URL" formControlName="serverB" [disabled]="!switchStateB" />
+            </mat-form-field>
+            <mat-slide-toggle formControlName="switchW" (change)="toggleInputB($event.checked)">
+              Black AI
+            </mat-slide-toggle>
+          </div>
+        </form>
+      </mat-card-content>
+    </mat-card>
+
+  </div>
+  <div class="col">
+    <h2>Turn:  {{turn === 'w' ? 'White' : 'Black'}} </h2>
+    <mat-chip-listbox #possibleMovesDiv aria-label="move selection" >
+      @for (move of possibleMoves; track $index) {
+        <mat-chip-option [value]="move"
+        (mouseover)="showMove(move)"
+        (mouseout)="resetMove($event)"
+        >{{move | toUci:currentFen}}</mat-chip-option>
+      }
+    </mat-chip-listbox>
+    <h3>Filter By:</h3>
+    <mat-chip-listbox #availablePiecesDiv aria-label="piece selection" multiple >
+      @for (piece of availablePieces; track $index) {
+        <mat-chip-option [value]="piece">
+        <img
+        [src]="'assets/pieces/'+piece+'.svg'">
+        </mat-chip-option>
+      }
+    </mat-chip-listbox>
+
+
+
+
+  </div>
+</div>
+

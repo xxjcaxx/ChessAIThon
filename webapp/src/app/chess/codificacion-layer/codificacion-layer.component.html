@@ -1,0 +1,18 @@
+<div class="layer">
+  <span>{{name}}</span>
+  <div class="board">
+    @for (row of layer; let idRow = $index;  track idRow) {
+        @for (cell of row; let idCol = $index; track idCol) {
+            <div class="cell" [ngClass]="
+              {'black':  (idRow+idCol) % 2 === 1,
+                'white':  (idRow+idCol) % 2 === 0,
+                'active':  cell != 0,
+                'innactive': cell === 0
+               }"
+
+            >{{cell}}</div>
+        }
+    }
+    </div>
+</div>
+

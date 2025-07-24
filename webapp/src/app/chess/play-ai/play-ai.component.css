@@ -1,0 +1,21 @@
+.container{
+  display: flex;
+  flex-wrap: wrap;
+  columns: 2;
+}
+
+.col {
+  padding: 20px;
+  min-width: 35%;
+  max-width: 40%;
+}
+
+
+mat-form-field{
+  width: 100%;
+}
+
+
+p.scenario_fen{
+  font-size: 0.7em;
+}

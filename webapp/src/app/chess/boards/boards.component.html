@@ -1,0 +1,54 @@
+<mat-grid-list cols="3" >
+
+  <mat-grid-tile colspan="1" rowspan="1">
+    <div style="display: flex; flex-wrap: wrap; width: 100%; padding: 10px;">
+     <div style="width: 100%; text-align: center;"><h2>Origin</h2></div>
+    <app-board style="width: 100%" [board]="scenario.fen" [name]="'origin'"></app-board>
+  </div>
+  </mat-grid-tile>
+  <mat-grid-tile colspan="1" rowspan="1">
+    <div style="display: flex; flex-wrap: wrap; width: 100%; padding: 10px;">
+    <div>
+      <h2>Turn:  {{turn === 'w' ? 'White' : 'Black'}} </h2>
+
+    </div>
+    <div>
+      <h2>Possible Moves</h2>
+      <mat-chip-listbox #possibleMovesDiv aria-label="move selection" >
+        @for (move of possibleMoves; track $index) {
+          <mat-chip-option [value]="move"
+          (mouseover)="showMove(move)"
+          (mouseout)="resetMove($event)"
+          >{{move}}</mat-chip-option>
+        }
+      </mat-chip-listbox>
+      <h3>Filter By:</h3>
+      <mat-chip-listbox #availablePiecesDiv aria-label="piece selection" multiple >
+        @for (piece of availablePieces; track $index) {
+          <mat-chip-option [value]="piece">
+          <img
+          [src]="'assets/pieces/'+piece+'.svg'">
+          </mat-chip-option>
+        }
+      </mat-chip-listbox>
+    </div>
+  </div>
+  </mat-grid-tile>
+  <mat-grid-tile colspan="1" rowspan="1">
+    <div style="display: flex; flex-wrap: wrap; width: 100%; padding: 10px;">
+      <div style="width: 100% ; text-align: center;"><h2>Result</h2></div>
+     <app-board [board]="result.fen" style="width: 100%" [name]="'result'"></app-board>
+   </div>
+  </mat-grid-tile>
+</mat-grid-list>
+<mat-grid-list cols="3" rowHeight="4:1" >
+  <mat-grid-tile colspan="1" rowspan="1">
+{{scenario.fen}}
+  </mat-grid-tile>
+  <mat-grid-tile colspan="1" rowspan="1">
+
+  </mat-grid-tile>
+  <mat-grid-tile colspan="1" rowspan="1">
+    {{result.fen}}
+  </mat-grid-tile>
+</mat-grid-list>

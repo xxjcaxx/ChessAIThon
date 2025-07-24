@@ -1,0 +1,32 @@
+<mat-sidenav-container class="">
+    <mat-sidenav mode="side" opened>
+        <mat-action-list>
+          <button mat-list-item role="listitem" [routerLink]="['home']">Home</button>
+            <mat-divider></mat-divider>
+            <button mat-list-item role="listitem" [routerLink]="['random']">Random Scenario</button>
+            <mat-divider></mat-divider>
+            <button mat-list-item role="listitem">Scenary List</button>
+            <mat-divider></mat-divider>
+            <button mat-list-item role="listitem">Popular Scenarys</button>
+            <mat-divider></mat-divider>
+            <button mat-list-item role="listitem" [routerLink]="['upload']">Upload</button>
+            <mat-divider></mat-divider>
+            <button mat-list-item role="listitem" [routerLink]="['upload']">Create Scenario</button>
+            <mat-divider></mat-divider>
+            <button mat-list-item role="listitem" [routerLink]="['play_ai']">Play AI</button>
+            <mat-divider></mat-divider>
+            <button mat-list-item role="listitem" [routerLink]="['codification']">Codification</button>
+          </mat-action-list>
+
+
+    </mat-sidenav>
+    <mat-sidenav-content>
+
+
+                    <router-outlet></router-outlet>
+
+
+    </mat-sidenav-content>
+  </mat-sidenav-container>
+
+

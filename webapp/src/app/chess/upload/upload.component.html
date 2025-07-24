@@ -1,0 +1,22 @@
+<mat-grid-list cols="6" >
+  <mat-grid-tile
+          colspan="2"
+          rowspan="2">
+<div>
+    <h2>Upload CSV</h2>
+    <form (ngSubmit)="onSubmit()">
+      <div>
+        <label for="fileInput">Select File:</label>
+        <input type="file" id="fileInput" (change)="onFileSelected($event)" />
+      </div>
+      @if(selectedFile){
+      <div>
+        <p>Selected File: {{ selectedFile.name }}</p>
+      </div>
+    }
+      <button type="submit" [disabled]="!selectedFile">Upload</button>
+    </form>
+  </div>
+
+</mat-grid-tile>
+</mat-grid-list>

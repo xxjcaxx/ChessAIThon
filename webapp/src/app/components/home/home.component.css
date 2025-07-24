@@ -1,0 +1,46 @@
+.background-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: calc(100vh);
+  background: url('/portada.webp') no-repeat center center;
+  background-size: cover;
+  z-index: -1;
+}
+
+.content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding: 40px 20px;
+  min-height: 100vh;
+}
+
+.main-card {
+  width: 90%;
+  max-width: 1200px;
+ /* background: rgba(255, 255, 255, 0.95);*/
+  text-align: center;
+  padding: 20px;
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.card-container {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  width: 90%;
+  max-width: 1200px;
+}
+
+.card {
+  width: 30%;
+  max-width: 350px;
+ /* background: rgba(255, 255, 255, 0.9);*/
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}

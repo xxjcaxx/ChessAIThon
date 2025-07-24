@@ -1,0 +1,34 @@
+<div class="container">
+    <div class="col">
+      <app-board style="width: 100%" [board]="scenario.fen" [name]="'origin'"></app-board>
+
+      <p class="scenario_fen">{{scenario.fen}}</p>
+
+
+
+      <mat-card >
+        <mat-card-content>
+          <form [formGroup]="fenForm">
+            <mat-form-field >
+              <mat-label>Set FEN</mat-label>
+              <input matInput placeholder="FEN Notation" formControlName="fen" />
+              <button matSuffix mat-icon-button (click)="setFen()">
+                <mat-icon>settings_backup_restore</mat-icon>
+              </button>
+
+            </mat-form-field>
+          </form>
+        </mat-card-content>
+      </mat-card>
+
+    </div>
+    <div class="col">
+      <div class="layers">
+        @for (layer of layers; track $index) {
+          <app-codificacion-layer [layer]="layer" [name]="name_layers[$index]"></app-codificacion-layer>
+        }
+      </div>
+
+    </div>
+  </div>
+
