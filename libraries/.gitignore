@@ -1,0 +1,45 @@
+# Python Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Entorno Virtual (venv)
+venv/
+.env/
+
+# Archivos de configuración de dependencias
+Pipfile
+Pipfile.lock
+poetry.lock
+
+# Archivos de logs y debugging
+logs/
+*.log
+*.out
+*.err
+debug.log
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# Configuración de editores y entornos de desarrollo
+.vscode/
+.idea/
+*.sublime-workspace
+
+# Archivos de compilación y caché
+*.egg-info/
+*.eggs/
+dist/
+build/
+
+# Archivos de cobertura de pruebas
+.coverage
+htmlcov/
+*.cover
+
+
+lib/
+lib64/
+bin/

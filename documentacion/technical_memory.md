@@ -116,9 +116,77 @@ Both AI systems utilize Convolutional Neural Networks (CNNs) for chess move pred
 
 In this documentation there is a document about training ChessMarro, the first version of our AI. 
 
+### Datasets
+
 First steps are searching for real cases of chess moves. We found lots of them in Kaggle. Other users upload games from **Lichess**. We found 30000 games pre-mate and many complete games. All of them had to be transformed in our format. We used Kaggle first, but later we had to use Colab too: https://www.kaggle.com/code/xxjcaxx/convert-to-chessintion-format
 
 The previous part is not necessary to repeat, we have more than enough here: https://www.kaggle.com/datasets/xxjcaxx/chess-games-in-fen-and-best-move
+
+We can store data in JSON o Parquet. In JSON we decided to compress each of the 77 board in a int64 number. In Parquet is not necessary because it can compress better.
+
+TODO: Decide best format and publish algorithms to convert. 
+
+### Training
+
+This is a Kaggle version of training:
+
+https://www.kaggle.com/code/xxjcaxx/cnn-pytorch-chess-generic
+
+This version uses only parquet files with generic games, not mates.
+
+This version (obsolete) uses only mates and has 90% of precision https://www.kaggle.com/code/xxjcaxx/cnn-pytorch-chess-mates
+
+The result CNN is not bad for the performance. Add more layers, or wider layers should increase precision, but it could be slower. We do lots of fine tunnings and this CNN and the result model is, for the moment, sufficient to go ahead.
+
+
+### Deploying the model
+
+We have a deployment in kaggle with MCTS: https://www.kaggle.com/code/xxjcaxx/launching-chessmarro
+
+And a demo in kaggle to play with the model: https://www.kaggle.com/code/xxjcaxx/play-with-chessmarro
+
+As we have lots of Kaggle and Colabs, we need to share the CNN and the model. We share it in Hugginface: https://huggingface.co/jocasal/chessmarrov1
+
+We deployed with CPU in Huggingface: https://huggingface.co/spaces/jocasal/chessmarro/tree/main
+
+And we have a Github repository: https://github.com/xxjcaxx/ai-libraries
+
+Now, add this "AI Libraries" to the official repository.
+
+All of these work were just drafts and trials. We need to centralize in:
+
+* Official Github repository with:
+  * AI model and CNN
+  * Libraries in C++ for MCTS
+  * Documentation (Docusarus in Github Pages)
+  * Source Code of the frontend
+  * Datasets
+* Kaggle for:
+  * Transform datasets to parquet
+  * Train the CNN model (Could be Google Colab too)
+  * Deploy the model
+* HuggingFace for:
+  * Deploy the model in CPU
+  * Share the model to the community and our Kaggles
+* Web App deployed with CI/CD from the github repository.
+
+
+The workflow is:
+
+Using Kaggle or Colab to improve model.
+Upload new versions of the model to Github and HuggingFace
+Using a link for this model in other Colab or Kaggle to test the model.
+Deploy in HuggingFace for tests purposes.
+Deploy in a local PC with GPU for the competition. 
+
+
+
+
+
+
+
+
+
 
 
 
