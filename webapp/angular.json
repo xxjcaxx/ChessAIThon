@@ -31,10 +31,12 @@
             "styles": [
               "@angular/material/prebuilt-themes/purple-green.css",
               "src/styles.css",
-              "node_modules/@chrisoakman/chessboard2/dist/chessboard2.min.css"
+              "node_modules/@chrisoakman/chessboard2/dist/chessboard2.min.css",
+              "node_modules/bootstrap/dist/css/bootstrap.min.css"
             ],
             "scripts": [
-              "node_modules/@chrisoakman/chessboard2/dist/chessboard2.min.js"
+              "node_modules/@chrisoakman/chessboard2/dist/chessboard2.min.js",
+               "node_modules/bootstrap/dist/js/bootstrap.bundle.min.js"
             ]
           },
           "configurations": {

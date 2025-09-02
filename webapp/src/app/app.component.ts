@@ -6,9 +6,10 @@ import { FooterComponent } from './components/footer/footer.component';
 import { MainComponent } from './components/main/main.component';
 
 
+
 @Component({
     selector: 'app-root',
-    imports: [CommonModule, HeaderComponent, FooterComponent, MainComponent],
+    imports: [CommonModule, HeaderComponent, FooterComponent, MainComponent, RouterOutlet],
     templateUrl: './app.component.html',
     styleUrl: './app.component.css'
 })
