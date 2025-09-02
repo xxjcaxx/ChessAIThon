@@ -9,7 +9,7 @@ However, to make our AI stand out from others, we need to go beyond the base dat
 To facilitate this process, we have developed a **web application** that allows users to interact with the dataset. Using this tool, you can download the existing dataset, review chess positions, and contribute new examples by adding your own insights on the best moves. These contributions can then be integrated into the training pipeline, further enhancing the AI's ability to make intelligent and human-like decisions.
 
 
-## Format of the dataset
+## Formats of the datasets
 
 In the initial stages of our project, we will use **CSV files** due to their simplicity and tabular structure, which makes them easy to work with. Each line in the CSV file will contain two key pieces of information: the `FEN` representation of the chessboard and the `best move` in `UCI`  format. 
 
@@ -17,6 +17,46 @@ To facilitate collaboration and data sharing, our **web application** will enabl
 
 Once the CSV files are ready, we will use an **ETL (Extract, Transform, Load) tool** developed in a **Google Colab Notebook** to process the data further. This tool will transform the raw CSV data into a more advanced format suitable for training our AI model. Specifically, it will generate a **parquet file** with two additional columns: 
 
-1. **77x8x8 Board Representation**: This is a numerical representation of the chessboard, formatted in a way that the AI model can easily process. It captures all the necessary information about the position, including piece locations, legal moves and other game states, in a structured 3D array.
+1. **77x8x8 Board Representation**: This is a numerical representation of the chessboard, formatted in a way that the AI model can easily process. It captures all the necessary information about the position, includ
+ing piece locations, legal moves and other game states, in a structured 3D array.
 2. **Move Representation (0 to 4096)**: Instead of using the UCI format, which is text-based, the move will be converted into a numerical value between 0 and 4096. This format is more efficient for the model to understand and process during training.
+
+This **Google Colab** will use our library to transform the data. This library is accessible in the project repository in Github.
+
+We will share the **Google Colab** with students in order to use it when they want and to explore the code or improve their own version of it. 
+
+For the Web Application we need to convert to another format: **JSON** with FEN, Best move in UCI anf 4096 format and 77x8x8 Board in 77 x 64 bits integer format. This will be easy for the API of web application and easy for Javascript/Angular in the client. 
+
+### CSV Dataset
+
+This is the simplest way to share information. It's easy to view with any text editor or Excel. And it's easy to undestrand for humans and most Chess programs. 
+
+Example:
+
+```csv
+fen,best
+1rb5/4r3/3p1npb/3kp1P1/1P3P1P/5nR1/2Q1BK2/bN4NR w - - 3 61,c2c4
+rn1q2n1/b3k1pr/pp1pB1Qp/2p1p1P1/2P1PP2/5R1P/P2P4/RNB1K3 w - - 1 24,g6f7
+8/3r3k/NP1p4/p2QP1P1/1BB3Pp/1R4n1/6K1/5R2 w - - 5 82,d5g8
+1nr1r3/n4Q2/P1kp2N1/2p3B1/1pp3P1/6P1/1R2P2R/K5N1 w - - 3 43,f7b7
+7Q/3Bk3/2P1p3/4P2P/7b/5K2/B7/1b6 w - - 3 78,h8e8
+8/4nB2/7k/3P2R1/p4p2/8/P4K2/6R1 w - - 3 78,g5h5
+```
+
+### Parquet Dataset
+
+Parquet format is not plain text, so it's only for use in python programming. It's very compressed and optimal for massive data. Final datasets for AI training will be in this format. 
+
+Inside parquet files we will have the same information than in CSV plus a 77x8x8 representation of board and legal moves; and a 4096 representation of the move. In training documentation is the explanation of this format and the transformation.
+
+
+## Existing datasets
+
+Datasets are public available at Kaggle. There are two:
+* https://www.kaggle.com/datasets/xxjcaxx/chess-games-in-fen-and-best-move  All the data. It is too big to manage. We can find al raw and converted data.
+* Selected data more than sufficient to train the CNN. Each file has more than 2 million of games converted and ready to train the AI model. We only used a fraction of first file to obtain a "good" model. We can use more data to fine tunning it. If we need even more data, we can use the other dataset. This dataset also includes the 25000 mate in one quality selected collection that can be used to fine tunning to reinforce mate performance of the model.  
+
+## Making students Dataset
+
+Web application of the project will help to create a store a dataset of selected games and best moves from our students. In order to work the other objectives of the project it will be available in CSV+FEN format. They will upload CSV to Github, Kaggle or Hugginface to import them in Colab and convert to Parquet format to train their own version of the model.
 
