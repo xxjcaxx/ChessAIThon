@@ -12,7 +12,7 @@ Claude Shannon, often called the "father of information theory," was one of the 
 1. **Brute-Force Strategy**: The computer would look at every possible move and outcome, calculating the best move step by step. This method is like exploring every single path in a maze to find the exit.  
 2. **Selective Strategy**: Instead of calculating every possible move, the computer would focus only on the most promising moves, using rules and logic to narrow down its choices. This is like taking educated guesses to solve the maze faster.  
 
-Around the same time, **Alan Turing**, the famous mathematician and codebreaker, was also thinking about chess and computers. Turing created one of the first chess algorithms—a set of instructions for a computer to follow to play the game.  
+Around the same time, **Alan Turing**, the famous mathematician and codebreaker, was also thinking about chess and computers. Turing created one of the first chess algorithms.
 
 The work of Shannon, Turing, and early programmers wasn’t just about teaching computers to play a game. It was about exploring how machines could think, solve problems, and make decisions. Chess became a way to test and improve the capabilities of computers, paving the way for the AI technologies we use today.  
 
@@ -20,7 +20,7 @@ So, the next time you play chess against a computer or even a chess app on your 
 
 ## Chess Representation
 
-When humans play chess, we see the board as a grid of squares with pieces on them. We visualize moves, plan strategies, and use our intuition to decide what to do next. But computers don’t "see" or "think" like humans—they need a way to represent the chessboard and pieces in a format they can understand and process quickly. Over the years, programmers have developed clever ways to store and manipulate chess positions, making it possible for computers to play the game efficiently.
+When humans play chess, we see the board as a grid of squares with pieces on them. We visualize moves, plan strategies, and use our intuition to decide what to do next. But computers don’t "see" or "think" like humans. They need a way to represent the chessboard and pieces in a format they can understand and process quickly. Over the years, programmers have developed clever ways to store and manipulate chess positions, making it possible for computers to play the game efficiently.
 
 ### **1. Bitboard Representation: A Compact and Powerful Tool**  
 One of the most efficient ways computers represent a chessboard is using something called a **bitboard**. A bitboard is a 64-bit number (since a chessboard has 64 squares) where each bit (a 0 or 1) represents a square on the board.  
@@ -28,7 +28,6 @@ One of the most efficient ways computers represent a chessboard is using somethi
 Each type of piece (pawns, knights, bishops, etc.) gets its own bitboard. For example, one bitboard might represent all the white pawns, and another might represent all the black rooks. If a bit is set to 1, it means a piece is on that square; if it’s 0, the square is empty.  
 
 Bitboards are incredibly fast for computers to process. They allow the computer to perform complex calculations (like checking for attacks or generating moves) using simple bitwise operations (like AND, OR, and XOR). This makes them perfect for chess engines that need to analyze millions of positions per second.  
-
 
 ### **2. Board Arrays and Piece-Centric Data Structures**  
 Another way computers represent the chessboard is using **arrays**. An array is like a list or grid that stores information about each square on the board.  
@@ -38,7 +37,6 @@ Another way computers represent the chessboard is using **arrays**. An array is 
 
 These methods are simpler than bitboards but are still useful for certain tasks, like displaying the board or checking the position of a specific piece.
 
-
 ### **3. Move Generation and Legality Checking**  
 Once the computer has a way to represent the board, it needs to figure out what moves are possible and which ones are legal. This is called **move generation** and **legality checking**.  
 
@@ -47,9 +45,8 @@ Once the computer has a way to represent the board, it needs to figure out what 
 
 We will rely for legaly checking in libraries like Python Chess: https://pypi.org/project/chess/ so we don't have to worry about it. 
 
-
 ### **How Humans Represent the Board and Moves**  
-Humans don’t use bitboards or arrays—we rely on our brains to visualize the board and plan moves. Here’s how we do it:  
+Humans don’t use bitboards or arrays, we rely on our brains to visualize the board and plan moves. Here’s how we do it:  
 
 - **Visualization**: When humans look at a chessboard, we see the entire position at once. We can quickly recognize patterns, like a fork (where one piece attacks two at the same time) or a pin (where a piece is stuck because moving it would expose a more valuable piece).  
 - **Notation**: Humans use chess notation (like "e4" or "Nf3") to record and describe moves. This helps us communicate and analyze games without needing to see the board.  
@@ -107,7 +104,6 @@ UCI (Universal Chess Interface) is a protocol that allows chess engines (like St
 - **Engine Output**: When the engine calculates a move, it responds with the `bestmove` command. For example:
   - `bestmove e2e4` means the engine recommends moving a pawn from e2 to e4.
 
-
 ## Chess and AI
 
 The journey of chess AI has been a fascinating evolution from rule-based systems to advanced machine learning approaches. In the early days, chess engines relied on **rule-based systems**, where programmers manually coded the rules of chess and strategies into the computer. These engines, like IBM’s Deep Blue, used brute-force calculations to evaluate millions of positions per second, combined with human-crafted evaluation functions to decide the best moves. While effective, these systems were limited by their reliance on human knowledge and the sheer computational power required to analyze complex positions.
@@ -118,9 +114,6 @@ One of the most iconic moments in the history of chess AI was the **Deep Blue vs
 
 The rise of **Monte Carlo Tree Search (MCTS)** further revolutionized chess engines. MCTS is a decision-making algorithm that simulates thousands of random games from a given position to estimate the best move. Unlike brute-force methods, MCTS focuses on the most promising lines of play, making it more efficient and effective. When combined with neural networks, as seen in AlphaZero, MCTS allows engines to explore positions deeply while leveraging learned patterns and strategies. This hybrid approach has become a cornerstone of modern chess AI.
 
+Monte Carlo Tree Search (MCTS) is more efficient than brute-force search, but its performance can be greatly enhanced when combined with neural networks. While a neural network cannot simulate all future moves, it has an intuitive ability to identify the most promising candidate moves at the outset. By guiding MCTS toward these moves, the search algorithm explores high-potential branches more effectively, rather than relying on random simulations. This synergy allows the engine to focus computational resources on the most relevant lines of play, leading to deeper and more accurate analysis.
+
 In the era of **modern chess AI**, engines like AlphaZero and Leela Chess Zero have taken center stage. These self-learning systems use **reinforcement learning**, a technique where the engine plays millions of games against itself, improving over time by learning from its mistakes and successes. Unlike classical engines, which rely on pre-programmed evaluation functions, neural network-based engines develop their own understanding of chess, often uncovering new strategies and ideas that challenge traditional human understanding of the game.
-
-The impact of reinforcement learning on chess AI cannot be overstated. It has not only made engines stronger but also changed how humans study and play chess. Neural network-based engines like AlphaZero have introduced novel concepts, such as the value of long-term positional play over short-term material gains, influencing how grandmasters approach the game. In contrast, classical engines like Stockfish, which rely on brute-force calculations and handcrafted evaluation functions, remain incredibly strong but lack the creativity and intuition of their neural network counterparts.
-
-The comparison between classical engines and neural network-based engines highlights the strengths and weaknesses of each approach. Classical engines excel at precise calculations and tactical accuracy, making them ideal for analyzing specific positions. On the other hand, neural network-based engines bring a more human-like understanding of strategy and long-term planning, often finding moves that classical engines might overlook. 
-
