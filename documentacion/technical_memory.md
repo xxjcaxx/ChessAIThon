@@ -124,7 +124,9 @@ The previous part is not necessary to repeat, we have more than enough here: htt
 
 We can store data in JSON o Parquet. In JSON we decided to compress each of the 77 board in a int64 number. In Parquet is not necessary because it can compress better.
 
-TODO: Decide best format and publish algorithms to convert. 
+> The best dataset prepared to train is: https://www.kaggle.com/datasets/xxjcaxx/chessmarro-dataset/data 
+
+
 
 ### Training
 
@@ -180,15 +182,10 @@ Deploy in HuggingFace for tests purposes.
 Deploy in a local PC with GPU for the competition. 
 
 
+# Links:
 
-
-
-
-
-
-
-
-
-
-
-https://github.com/carlos-paezf/Software_Construction?utm_source=chatgpt.com
+* Convert from FEN to 77x8x8 format: https://www.kaggle.com/code/xxjcaxx/convert-to-chessintion-format?scriptVersionId=259827731
+* Dataset: https://www.kaggle.com/datasets/xxjcaxx/chessmarro-dataset/data
+* Train: https://www.kaggle.com/code/xxjcaxx/cnn-pytorch-chess-generic 
+* Deploy example: https://www.kaggle.com/code/xxjcaxx/launching-chessmarro
+* Github: https://github.com/xxjcaxx/ChessAIThon
