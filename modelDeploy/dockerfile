@@ -1,0 +1,26 @@
+# Imagen base ligera de Python
+FROM python:3.11-slim
+
+# Evita que Python genere archivos .pyc y mejora logs
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Crea un directorio para la app
+WORKDIR /app
+
+# Copia requirements primero (para aprovechar la cache de Docker)
+COPY requirements.txt .
+
+# Instala dependencias (mejor usar pip + no cache para que sea liviano)
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copia el resto de la app
+COPY . .
+
+# Expone el puerto que usará Gradio
+EXPOSE 7860
+
+# Comando para ejecutar la app
+# Asumiendo que tu script principal se llama app.py y corre Gradio
+CMD ["python", "app.py"]
+
