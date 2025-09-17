@@ -181,6 +181,76 @@ Using a link for this model in other Colab or Kaggle to test the model.
 Deploy in HuggingFace for tests purposes.
 Deploy in a local PC with GPU for the competition. 
 
+#### Multi process
+
+In this repository will be a docker that implements mcts in multi process to improve cpu and model performance. 
+
+
+* **Batching mechanism**: Instead of letting every client process call the model individually, requests are accumulated into batches. This ensures efficient GPU use by processing several positions at once.
+
+* **Dedicated worker process**: A separate worker process owns the model and runs inference. This avoids re-initializing CUDA in forked processes and keeps all predictions centralized.
+
+* **Queues for communication**:
+
+  * An **input queue** is used to send batches of board tensors and their associated task IDs to the worker.
+  * An **output queue** carries back the predictions, paired with their task IDs.
+
+* **Task identifiers**: Each client request is assigned a unique ID so predictions can be matched back to the correct requester, even if requests from multiple processes are mixed in a single batch.
+
+* **Shared response channels**: Each client process provides a response queue, created via a `multiprocessing.Manager`, that is stored in a shared dictionary (`pending`). This makes it possible for the dispatcher to place results into the right client’s queue, across process boundaries.
+
+* **Dispatcher loop**: A separate loop continuously monitors the output queue, extracts predictions, looks up the corresponding response queue in the shared dictionary, and forwards the result.
+
+* **Shared state via Manager**: Critical data structures such as `pending` and the client response queues are created through a `Manager` so they are visible and usable across all processes, avoiding the issue of processes only having local copies.
+
+This design allows multiple processes to submit requests concurrently, have them batched efficiently for inference, and still receive their individual predictions reliably.
+
+Here’s the **step-by-step lifecycle flow** of how a client request travels through the system until the prediction is delivered back:
+
+1. **Client creates a request**
+
+   * A board tensor is prepared.
+   * A new response queue (via `Manager`) is created for this request.
+   * The request is assigned a unique task ID.
+   * The request (tensor + task ID) is added to the batcher, and the response queue is registered in the shared `pending` dictionary under that task ID.
+
+2. **Batching**
+
+   * The batcher collects incoming requests until the batch size is reached (or until explicitly flushed).
+   * Once ready, the batcher sends the accumulated tensors and their task IDs as a single item to the **input queue**.
+
+3. **Worker process**
+
+   * The worker continuously listens to the input queue.
+   * When a batch arrives, it stacks the tensors into one batch tensor and runs the model on the GPU.
+   * The predictions are generated and paired with the task IDs from the batch.
+   * The list of `(task_id, prediction)` results is placed onto the **output queue**.
+
+4. **Dispatcher loop**
+
+   * A dispatcher process listens to the output queue.
+   * For each `(task_id, prediction)` in the results:
+
+     * It looks up the correct response queue in the shared `pending` dictionary.
+     * It places the prediction into that response queue.
+     * It removes the entry from `pending` once delivered.
+
+5. **Client receives result**
+
+   * The client waits on its response queue (`q.get()`).
+   * As soon as the dispatcher places the prediction there, the client unblocks and receives the move.
+
+6. **Cleanup**
+
+   * When shutting down, the batcher flushes any remaining requests, sends a termination signal to the worker, and joins all processes cleanly.
+
+This flow guarantees that:
+
+* Multiple clients across processes can safely submit requests.
+* The model runs only once per batch in a controlled worker process.
+* Each client receives the correct prediction asynchronously, even if batches mix requests from different processes.
+
+
 
 # Links:
 
