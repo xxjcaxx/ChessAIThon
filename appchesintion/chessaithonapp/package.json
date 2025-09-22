@@ -10,5 +10,8 @@
   },
   "devDependencies": {
     "vite": "^7.1.6"
+  },
+  "dependencies": {
+    "chessmarro-board": "^0.0.12"
   }
 }

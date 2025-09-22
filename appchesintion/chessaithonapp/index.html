@@ -1,13 +1,52 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ChessAIthon</title>
-    <script type="module" src="/src/main.js"></script>
-  </head>
-  <body>
-    <div id="app"></div>
-  </body>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chess Minds</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+<link rel="stylesheet" href="src/style.css">
+<link rel="icon" type="image/png" href="/iconopequenyo.png" />
+<script src="src/main.js" type="module"></script>
+</head>
+<body>
+  <!-- CABECERA -->
+  <nav class="navbar is-dark is-fixed-top" role="navigation">
+    <div class="navbar-brand">
+      <a class="navbar-item"><img src="/iconoblanco.svg"> Chess Minds</a>
+      <a role="button" class="navbar-burger" id="toggleSidebar" aria-label="menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </a>
+    </div> 
+  </nav>
+
+  <!-- MENÚ LATERAL -->
+<chess-sidebar></chess-sidebar>
+
+  <!-- CONTENIDO -->
+  <chess-home></chess-home>
+
+
+  <!-- FOOTER -->
+  <footer class="footer has-background-dark has-text-white has-text-centered is-fixed-bottom">
+    <p>© 2025 Mi Web - Todos los derechos reservados</p>
+  </footer>
+
+  <!-- SCRIPT para mostrar/ocultar menú -->
+  <script>
+    const sidebar = document.getElementById('sidebar');
+    const toggleBtn = document.getElementById('toggleSidebar');
+    const mainContent = document.querySelector('.main-content');
+
+    toggleBtn.addEventListener('click', () => {
+      sidebar.classList.toggle('is-hidden');
+      toggleBtn.classList.toggle("is-active");
+      if (sidebar.classList.contains('is-hidden')) {
+        mainContent.style.marginLeft = "0";
+      } else {
+        mainContent.style.marginLeft = "250px";
+      }
+    });
+  </script>
+</body>
 </html>
