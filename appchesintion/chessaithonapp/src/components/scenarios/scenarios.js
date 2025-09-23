@@ -2,6 +2,19 @@ import { setFen } from "chessmarro-board";
 import template from "./scenariosTemplate.html?raw"
 import style from "./style.css?inline"
 
+
+const fensToRows = (rows) => {
+  return rows.map(
+    (fen) => {
+      const row = document.createElement("tr");
+      row.classList.add("is-primary","is-clickable");
+      row.innerHTML = `<td data-fen="${fen}">${fen}</td>`;
+      return row;
+    }
+  );
+
+}
+
 class ScenariosComponent extends HTMLElement {
 
   async connectedCallback() {
@@ -18,29 +31,43 @@ class ScenariosComponent extends HTMLElement {
 
     const scenariosListTable = templateWrapper.querySelector("#scenariosListTable").content.querySelector("table");
     const scenariosListTableTbody = scenariosListTable.querySelector("tbody");
-    const response = await fetch("chess_endgames.csv");
-    const data = await response.text();
-    const rows = data.split("\n");
-    for (let fen of rows) {
-      const row = document.createElement("tr");
 
-      row.classList.add("is-primary");
-      row.innerHTML = `<td data-fen="${fen}">${fen}</td>`;
-      scenariosListTableTbody.appendChild(row);
+
+    const localstorageData = localStorage.getItem('best_moves');
+    if (localstorageData) {
+      let bestMoves = [];
+      try{
+       bestMoves = JSON.parse(localstorageData);
+      }
+      catch(e){
+
+      }
+      const bestMovesFens = bestMoves.map(bmf=> bmf.fen)
+      scenariosListTableTbody.append(...fensToRows(bestMovesFens));
     }
+
 
     scenariosListDiv.addEventListener("mouseover", (event) => {
       if (event.target.tagName === "TD") {
         const fen = event.target.dataset.fen;
         board.board = setFen(fen);
-        board.render();
+        board.refresh();
       }
     });
+
+
 
 
     scenariosListDiv.append(scenariosListTable);
 
 
+
+    document.querySelector('#load-defaults-button').addEventListener('click', async () => {
+      const response = await fetch("chess_endgames.csv");
+      const data = await response.text();
+      const rows = data.split("\n");
+      scenariosListTableTbody.append(...fensToRows(rows));
+    });
 
   }
 

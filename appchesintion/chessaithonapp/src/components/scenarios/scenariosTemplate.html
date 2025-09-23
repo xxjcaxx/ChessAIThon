@@ -1,27 +1,98 @@
-<div class="main-content container is-fluid columns p-6">
-<div id="representation" class="column pt-6" >
-   
-    <div class="container board-container">
-        <h2 class="title is-2">Play a Scenario</h2>
-        <chessmarro-board
-        
-        ></chessmarro-board>
+<div  class="has-background-dark has-text-white main-content container is-fluid columns p-6">
+    <div id="representation" class="column pt-6">
+        <div class="board-container">
+            <h2 class="title is-2 ">Play a Scenario</h2>
+            <div class="columns">
+                <div class="column is-three-quarters">
+                    <h2 class="title is-3 has-text-white">Board</h2>
+                    <chessmarro-board></chessmarro-board>
+                </div>
+                <div class="column">
+                    <h2 class="title is-3">Moves</h2>
+                    <div id="moves-list"></div>
+                </div>
+
+            </div>
+
+
+
+        </div>
+
     </div>
- 
-</div>
-<div id="scenariosList" class="column pt-6">
-</div>
+    <div id="scenariosList" class="column pt-6">
+
+        <h2 class="title is-2">Scenarios Management</h2>
+        <p>
+            Here you can upload your own CSV/FEN files with chess scenarios.
+            When you choose and resolve a scenario it will be stored in your
+            browser. You can see and change your solution.
+            <br>
+            When you finish, you can export scenarios and solutions in CSV in order
+            to train your AI model.
+            <br>
+            You can also load our default scenarios or provide a url for scenarios online.
+        </p>
+        <br>
+        <div class="field is-horizontal">
+            <div class="field-body">
+                <div class="field">
+                    <button id="load-defaults-button" class="button  is-small">Load Default Scenarios</button>
+                </div>
+                <div class="field">
+                    <div class="file has-name is-small ">
+                        <label class="file-label is-small ">
+                            <input class="file-input is-small " type="file" name="resume" />
+                            <span class="file-cta ">
+                                <span class="file-icon ">
+                                    <i class="fas fa-upload"></i>
+                                </span>
+                                <span class="file-label "> Choose a file… </span>
+                            </span>
+                            <span class="file-name"> chess_scenarios.csv </span>
+                        </label>
+                    </div>
+                </div>
+
+
+                <div class="field">
+                    <div class="field has-addons is-small">
+                        <div class="control">
+                            <input class="input is-small" type="text" placeholder="Link to csv">
+                        </div>
+                        <div class="control">
+                            <button class="button  is-small">
+                                Load
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
+
+
+
+
+
+
+
+
+
+
+
 <template id="scenariosListTable">
+
+
     <table class="table is-striped is-hoverable is-fullwidth">
         <thead>
             <tr>
                 <th>Choose a Scenario</th>
-               </tr>
+            </tr>
         </thead>
-      <tbody>
+        <tbody>
 
-      </tbody>
+        </tbody>
     </table>
 </template>
