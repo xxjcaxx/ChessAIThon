@@ -1,66 +1,50 @@
+import { setFen } from "chessmarro-board";
+import template from "./scenariosTemplate.html?raw"
+import style from "./style.css?inline"
+
 class ScenariosComponent extends HTMLElement {
 
-    connectedCallback() {
-        this.innerHTML = `
-<div class="main-content" style="margin-left:250px">
-    <section class="hero is-fullheight-with-navbar">
-      <div class="hero-body has-text-centered">
-        <div class="container">
-          <h1 class="title has-text-white is-2">ChessAIthon</h1>
-          <p class="subtitle has-text-white">Explore Chess AI</p>
-          <div class="columns is-multiline is-centered mt-6">
-            <!-- Cards -->
-            <div class="column is-4-desktop is-6-tablet">
-              <div class="card">
-                <div class="card-content">
-                  <p class="title is-5">Inicio</p>
-                </div>
-              </div>
-            </div>
-            <div class="column is-4-desktop is-6-tablet">
-              <div class="card">
-                <div class="card-content">
-                  <p class="title is-5">Acerca de</p>
-                </div>
-              </div>
-            </div>
-            <div class="column is-4-desktop is-6-tablet">
-              <div class="card">
-                <div class="card-content">
-                  <p class="title is-5">Servicios</p>
-                </div>
-              </div>
-            </div>
-            <div class="column is-4-desktop is-6-tablet">
-              <div class="card">
-                <div class="card-content">
-                  <p class="title is-5">Proyectos</p>
-                </div>
-              </div>
-            </div>
-            <div class="column is-4-desktop is-6-tablet">
-              <div class="card">
-                <div class="card-content">
-                  <p class="title is-5">Blog</p>
-                </div>
-              </div>
-            </div>
-            <div class="column is-4-desktop is-6-tablet">
-              <div class="card">
-                <div class="card-content">
-                  <p class="title is-5">Contacto</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  </div>
-`;
+  async connectedCallback() {
+    const styleElement = document.createElement("style");
+    styleElement.textContent = style;
+    this.append(styleElement);
+    const templateWrapper = document.createElement("div");
+    templateWrapper.innerHTML = template;
+    this.append(templateWrapper.querySelector(".main-content").cloneNode(true));
+    const scenariosListDiv = this.querySelector("#scenariosList");
+    const scenariosRepresentation = this.querySelector("#representation");
+    const board = this.querySelector("chessmarro-board");
+
+
+    const scenariosListTable = templateWrapper.querySelector("#scenariosListTable").content.querySelector("table");
+    const scenariosListTableTbody = scenariosListTable.querySelector("tbody");
+    const response = await fetch("chess_endgames.csv");
+    const data = await response.text();
+    const rows = data.split("\n");
+    for (let fen of rows) {
+      const row = document.createElement("tr");
+
+      row.classList.add("is-primary");
+      row.innerHTML = `<td data-fen="${fen}">${fen}</td>`;
+      scenariosListTableTbody.appendChild(row);
     }
+
+    scenariosListDiv.addEventListener("mouseover", (event) => {
+      if (event.target.tagName === "TD") {
+        const fen = event.target.dataset.fen;
+        board.board = setFen(fen);
+        board.render();
+      }
+    });
+
+
+    scenariosListDiv.append(scenariosListTable);
+
+
+
+  }
 
 
 }
 
-customElements.define("scenarios-home", ScenariosComponent);
+customElements.define("chess-scenarios", ScenariosComponent);

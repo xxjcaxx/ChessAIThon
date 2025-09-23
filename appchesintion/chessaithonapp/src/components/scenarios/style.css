@@ -1,0 +1,13 @@
+.main-content {
+
+}
+
+
+#scenariosList{
+    overflow: auto;
+    height: 100vh;
+}
+
+.board-container {
+    width:  75vh;
+}

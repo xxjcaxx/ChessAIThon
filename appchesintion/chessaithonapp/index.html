@@ -11,20 +11,16 @@
 </head>
 <body>
   <!-- CABECERA -->
-  <nav class="navbar is-dark is-fixed-top" role="navigation">
-    <div class="navbar-brand">
-      <a class="navbar-item"><img src="/iconoblanco.svg"> Chess Minds</a>
-      <a role="button" class="navbar-burger" id="toggleSidebar" aria-label="menu" aria-expanded="false">
-        <span></span><span></span><span></span>
-      </a>
-    </div> 
-  </nav>
-
-  <!-- MENÚ LATERAL -->
-<chess-sidebar></chess-sidebar>
+  <chess-navbar></chess-navbar>
 
   <!-- CONTENIDO -->
-  <chess-home></chess-home>
+   <div id="content">
+   <!--<chess-home></chess-home> -->
+    <chess-scenarios></chess-scenarios>
+    <chess-play></chess-play>
+
+   </div>
+
 
 
   <!-- FOOTER -->
@@ -32,21 +28,5 @@
     <p>© 2025 Mi Web - Todos los derechos reservados</p>
   </footer>
 
-  <!-- SCRIPT para mostrar/ocultar menú -->
-  <script>
-    const sidebar = document.getElementById('sidebar');
-    const toggleBtn = document.getElementById('toggleSidebar');
-    const mainContent = document.querySelector('.main-content');
-
-    toggleBtn.addEventListener('click', () => {
-      sidebar.classList.toggle('is-hidden');
-      toggleBtn.classList.toggle("is-active");
-      if (sidebar.classList.contains('is-hidden')) {
-        mainContent.style.marginLeft = "0";
-      } else {
-        mainContent.style.marginLeft = "250px";
-      }
-    });
-  </script>
 </body>
 </html>

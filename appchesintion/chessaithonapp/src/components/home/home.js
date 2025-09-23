@@ -2,7 +2,7 @@ class HomeComponent extends HTMLElement {
 
     connectedCallback() {
         this.innerHTML = `
-<div class="main-content" style="margin-left:250px">
+<div class="main-content">
     <section class="hero is-fullheight-with-navbar">
       <div class="hero-body has-text-centered">
         <div class="container">
