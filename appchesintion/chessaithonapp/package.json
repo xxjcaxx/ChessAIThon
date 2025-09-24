@@ -12,6 +12,7 @@
     "vite": "^7.1.6"
   },
   "dependencies": {
+    "chess.js": "^1.4.0",
     "chessmarro-board": "^0.0.12"
   }
 }

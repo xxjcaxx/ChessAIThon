@@ -1,14 +1,17 @@
-<div  class="has-background-dark has-text-white main-content container is-fluid columns p-6">
+<div  class="has-background-dark has-text-white main-content container is-fluid columns p-6 is-desktop">
     <div id="representation" class="column pt-6">
-        <div class="board-container">
-            <h2 class="title is-2 ">Play a Scenario</h2>
+        <div class="">
+            <h2 class="title is-2 has-text-white">Play a Scenario</h2>
             <div class="columns">
                 <div class="column is-three-quarters">
                     <h2 class="title is-3 has-text-white">Board</h2>
-                    <chessmarro-board></chessmarro-board>
+                    <chessmarro-board
+                    data-numbers-color="#222"
+                    data-numbers = "true"
+                    ></chessmarro-board>
                 </div>
                 <div class="column">
-                    <h2 class="title is-3">Moves</h2>
+                    <h2 class="title is-3 has-text-white">Moves</h2>
                     <div id="moves-list"></div>
                 </div>
 
@@ -21,7 +24,7 @@
     </div>
     <div id="scenariosList" class="column pt-6">
 
-        <h2 class="title is-2">Scenarios Management</h2>
+        <h2 class="title is-2 has-text-white">Scenarios Management</h2>
         <p>
             Here you can upload your own CSV/FEN files with chess scenarios.
             When you choose and resolve a scenario it will be stored in your

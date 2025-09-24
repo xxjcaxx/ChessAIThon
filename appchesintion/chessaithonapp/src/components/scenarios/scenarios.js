@@ -1,6 +1,7 @@
 import { setFen } from "chessmarro-board";
 import template from "./scenariosTemplate.html?raw"
 import style from "./style.css?inline"
+import { Chess } from 'chess.js'
 
 
 const fensToRows = (rows) => {
@@ -15,6 +16,26 @@ const fensToRows = (rows) => {
 
 }
 
+const renderMoves= (moves) =>{
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = '<div class="tags">'+moves.map((move)=> `
+  <span data-move="${move}"class="tag is-light is-clickable">${move}</span>
+  `).join('')+'</ul>';
+  return wrapper.firstChild;
+}
+
+
+const uciToMove = (uci) => {
+  const letters = [" ", "a", "b", "c", "d", "e", "f", "g", "h", " "];
+  const [oy, ox, dy, dx] = uci.split("");
+  return [
+    letters.indexOf(oy) - 1,
+    8 - parseInt(ox),
+    letters.indexOf(dy) - 1,
+    8 - parseInt(dx),
+  ];
+};
+
 class ScenariosComponent extends HTMLElement {
 
   async connectedCallback() {
@@ -27,7 +48,7 @@ class ScenariosComponent extends HTMLElement {
     const scenariosListDiv = this.querySelector("#scenariosList");
     const scenariosRepresentation = this.querySelector("#representation");
     const board = this.querySelector("chessmarro-board");
-
+    const movesList = this.querySelector("#moves-list");
 
     const scenariosListTable = templateWrapper.querySelector("#scenariosListTable").content.querySelector("table");
     const scenariosListTableTbody = scenariosListTable.querySelector("tbody");
@@ -52,6 +73,32 @@ class ScenariosComponent extends HTMLElement {
         const fen = event.target.dataset.fen;
         board.board = setFen(fen);
         board.refresh();
+        
+        const chess = new Chess(fen, { skipValidation : true });
+        const moves = chess.moves({verbose:true}).map(m=> m.lan)
+        movesList.replaceChildren(renderMoves(moves))
+        
+
+      }
+    });
+
+
+    movesList.addEventListener("mouseover", (event)=>{
+      if (event.target.tagName === "SPAN") {
+        const [x,y,X,Y] = uciToMove(event.target.dataset.move);
+        const resetBoard = board.board
+        board.movePiece([x,y],[X,Y],0.5);
+        event.target.addEventListener("mouseout",(et)=>{
+          console.log("mouseout");
+          
+          board.movePiece([X,Y],[x,y],0.5);
+          //board.board = resetBoard;
+          setTimeout(()=>{
+            board.board = resetBoard;
+            board.refresh();
+          },500)
+          //board.refresh();
+        }, { once: true });
       }
     });
 

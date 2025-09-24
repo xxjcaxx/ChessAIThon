@@ -1,5 +1,7 @@
 .main-content {
+    /*
 background: linear-gradient(45deg, #0f255fff, #0f255fff, #602f83ff);
+*/
 }
 
 
@@ -10,4 +12,8 @@ background: linear-gradient(45deg, #0f255fff, #0f255fff, #602f83ff);
 
 .board-container {
     width:  75vh;
+}
+
+.moves-list{
+    display: inline-block; list-style: none;padding:0;
 }
