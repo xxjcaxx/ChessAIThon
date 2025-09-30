@@ -33,7 +33,7 @@ Bitboards are incredibly fast for computers to process. They allow the computer 
 Another way computers represent the chessboard is using **arrays**. An array is like a list or grid that stores information about each square on the board.  
 
 - **Board Arrays**: A simple 8x8 array can represent the chessboard, with each cell in the array storing information about the piece on that square (or if it’s empty). For example, the computer might use numbers or letters to represent each piece (like "P" for pawn, "N" for knight, etc.).  
-- **Piece-Centric Data Structures**: Instead of focusing on the board, the computer can also store information about each piece individually. For example, it might keep a list of all the pieces and their positions, making it easier to track where everything is.  
+- **Piece-Centric Data Structures**: Instead of focusing on the board, the computer can also store information about each piece individually. For example, it might keep a list of all the pieces and their positions, making it easier to track where everything is. NNUE from Stockfish is an example of it.  
 
 These methods are simpler than bitboards but are still useful for certain tasks, like displaying the board or checking the position of a specific piece.
 
@@ -118,10 +118,37 @@ Monte Carlo Tree Search (MCTS) is more efficient than brute-force search, but it
 
 In the era of **modern chess AI**, engines like AlphaZero and Leela Chess Zero have taken center stage. These self-learning systems use **reinforcement learning**, a technique where the engine plays millions of games against itself, improving over time by learning from its mistakes and successes. Unlike classical engines, which rely on pre-programmed evaluation functions, neural network-based engines develop their own understanding of chess, often uncovering new strategies and ideas that challenge traditional human understanding of the game.
 
-Stockfish has implemented NNUE in order to generate more "Human" moves: https://official-stockfish.github.io/docs/nnue-pytorch-wiki/docs/nnue.html#a-simple-nnue-network .NNUE is what allowed Stockfish to combine classical brute-force search with neural evaluation—and that’s why Stockfish remains at the top of computer chess today. 
+Stockfish has implemented NNUE in order to generate more "Human" moves: https://official-stockfish.github.io/docs/nnue-pytorch-wiki/docs/nnue.html#a-simple-nnue-network . NNUE is what allowed Stockfish to combine classical brute-force search with neural evaluation—and that’s why Stockfish remains at the top of computer chess today. The architecture is very different to Alphazero neural network because it doesn't store board matrix, it instead represent piece–square pairs (e.g., “white knight on f3”). 
 
-NNUE represents the board using **piece–square pairs** (e.g., “white knight on f3”).
-Each piece type × square × color is a unique input (~768+ features).
-Only occupied squares are active, making the input **sparse**.
-When a piece moves, only the old and new squares update, enabling **fast incremental evaluation**.
+Stockfish’s strategy represents a hybrid milestone in the history of chess AI: unlike early engines such as Deep Blue that relied purely on brute-force search and handcrafted evaluation, and unlike modern neural systems such as AlphaZero that use deep reinforcement learning and stochastic search, Stockfish combines its powerful deterministic **alpha-beta** search with **NNUE (Efficiently Updatable Neural Networks)**, a lightweight neural evaluator trained on massive datasets. This approach keeps the speed and depth of classical engines while integrating the pattern-recognition strengths of neural networks, showing how the evolution of chess AI has moved from pure calculation, through stochastic learning, toward a synthesis of both traditions.
 
+
+
+### Training Chess AI
+
+In summary, there are several approaches to modeling and training a chess AI. For our project, we will not adopt brute-force search or hard-coded heuristic techniques to determine the best move. Instead, our approach is more **stochastic** and less **deterministic**. 
+
+By integrating **Monte Carlo Tree Search (MCTS)** with a neural network, we can introduce controlled randomness or “personality” into the AI’s playstyle. 
+
+> We acknowledge that, given our limited computational resources, this experiment will not achieve performance comparable to traditional engines, let alone systems such as AlphaZero. However, it will serve as a valuable learning experience. This approach directly aligns with the **stochastic nature** of our project, where the integration of the **Chessmaro CNN** with **Monte Carlo Tree Search (MCTS)** is not just a technical choice, but a **pedagogical and philosophical one**.
+
+The MCTS-enhanced CNN allows us to move beyond a pure evaluation function and incorporate the essential human elements of chess captured in the earlier points: **complexity, difficulty, and player personality.**
+
+The inherent **randomness** introduced by MCTS—specifically in its exploration phase and its reliance on the neural network's **probability distribution** over moves (rather than a single deterministic evaluation)—serves as the technical analog for **human personality**.
+
+* **Controlled "Error":** The model won't always choose the move with the highest engine evaluation, but rather a move with a **high probability** of being played by a human with similar training data. This controlled divergence from the "perfect" move is key to modeling the fact that **chess players are likely to make errors in difficult positions, unlike engines**.
+* **Modeling Difficulty:** By using the CNN to guide the MCTS, positions that are intrinsically **difficult for human players** will likely result in a flatter, less decisive probability distribution from the Chessmaro model. This uncertainty in the model directly corresponds to the **complexity metric** we want to develop.
+
+Our choice of a data-driven model, trained on student-generated moves, directly enables the application of player profiling and customized opening theory:
+
+* **Complexity Tendencies** By analyzing which nodes the **MCTS explores** most frequently and the **depth/breadth** of the search required before a decision is made, we can generate real-time metrics that reflect the position's perceived difficulty for the AI. This data is essential for devising **opening systems** around an opponent’s **tendency to seek or avoid complexity**.
+* **Targeted Training and Diagnostics:** The human-centric nature of the **Chessmaro CNN** allows us to focus our **VET training dataset** on specific types of positions. We can:
+    * Feed the model with data filtered by **player rating and time control**.
+    * Retrain or fine-tune models on positions that are empirically **difficult for low-rated players and easy for high-rated players**. The resulting differences in the move probabilities between the two models would form the basis of a **diagnostic chess exam** to identify a player's knowledge gaps.
+
+Integrating the MCTS/CNN output provides a more robust, **data-driven method** for rating and generating challenges:
+
+* **Advanced Puzzle Generation:** We can use the MCTS to find moves that are not tactically decisive but represent a **positional challenge**. A puzzle solution could be defined not by a vast evaluation difference, but by a move that significantly **increases the MCTS win rate** while having a relatively small difference in the **CNN's predicted move probability**. This creates the desired **non-tactical puzzles**.
+* **Faster Rating Establishment:** By using the **confidence/uncertainty** of the Chessmaro model’s output for a given position, we can assign an **initial complexity/difficulty score** with far greater speed and accuracy than the current "elo"-based trial-and-error method, thus requiring **fewer attempts to establish an initial puzzle rating**.
+
+In essence, the MCTS/CNN framework is the **technical vehicle** for transforming theoretical ideas about **human cognitive difficulty** into practical, measurable, and educational tools.
