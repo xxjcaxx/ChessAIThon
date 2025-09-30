@@ -117,3 +117,11 @@ The rise of **Monte Carlo Tree Search (MCTS)** further revolutionized chess engi
 Monte Carlo Tree Search (MCTS) is more efficient than brute-force search, but its performance can be greatly enhanced when combined with neural networks. While a neural network cannot simulate all future moves, it has an intuitive ability to identify the most promising candidate moves at the outset. By guiding MCTS toward these moves, the search algorithm explores high-potential branches more effectively, rather than relying on random simulations. This synergy allows the engine to focus computational resources on the most relevant lines of play, leading to deeper and more accurate analysis.
 
 In the era of **modern chess AI**, engines like AlphaZero and Leela Chess Zero have taken center stage. These self-learning systems use **reinforcement learning**, a technique where the engine plays millions of games against itself, improving over time by learning from its mistakes and successes. Unlike classical engines, which rely on pre-programmed evaluation functions, neural network-based engines develop their own understanding of chess, often uncovering new strategies and ideas that challenge traditional human understanding of the game.
+
+Stockfish has implemented NNUE in order to generate more "Human" moves: https://official-stockfish.github.io/docs/nnue-pytorch-wiki/docs/nnue.html#a-simple-nnue-network .NNUE is what allowed Stockfish to combine classical brute-force search with neural evaluation—and that’s why Stockfish remains at the top of computer chess today. 
+
+NNUE represents the board using **piece–square pairs** (e.g., “white knight on f3”).
+Each piece type × square × color is a unique input (~768+ features).
+Only occupied squares are active, making the input **sparse**.
+When a piece moves, only the old and new squares update, enabling **fast incremental evaluation**.
+
