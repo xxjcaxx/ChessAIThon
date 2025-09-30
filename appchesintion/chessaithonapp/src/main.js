@@ -9,7 +9,7 @@ initChessmarroBoard();
 console.log("main");
 
 document.addEventListener("DOMContentLoaded", () => {
-  window.location.hash = "#home";
+  //window.location.hash = "#home";
   router(window.location.hash);
   window.addEventListener("hashchange", () => {
     router(window.location.hash);
