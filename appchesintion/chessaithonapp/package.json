@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "chess.js": "^1.4.0",
-    "chessmarro-board": "^0.0.13"
+    "chessmarro-board": "^0.0.13",
+    "rxjs": "^7.8.2"
   }
 }

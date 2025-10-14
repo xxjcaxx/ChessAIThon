@@ -2,6 +2,8 @@ import { setFen, getFen } from "chessmarro-board";
 import template from "./scenariosTemplate.html?raw"
 import style from "./style.css?inline"
 import { Chess } from 'chess.js'
+import { BehaviorSubject, Subject, fromEvent, map, filter, tap, switchMap, of, throttleTime, asyncScheduler, concat, take, concatMap } from 'rxjs';
+
 
 
 const fensToRows = (rows) => {
@@ -25,11 +27,11 @@ const renderMoves = (moves) => {
 }
 
 const renderMovesDiv = (movesList, fen) => {
-  if(fen){
-  const chess = new Chess(fen, { skipValidation: true });
-  const currentTurn = chess.turn();
-  const moves = chess.moves({ verbose: true }).map(m => ({ piece: chessPiecesUnicode[currentTurn === "b" ? m.piece : m.piece.toUpperCase()], lan: m.lan }))
-  movesList.replaceChildren(renderMoves(moves))
+  if (fen) {
+    const chess = new Chess(fen, { skipValidation: true });
+    const currentTurn = chess.turn();
+    const moves = chess.moves({ verbose: true }).map(m => ({ piece: chessPiecesUnicode[currentTurn === "b" ? m.piece : m.piece.toUpperCase()], lan: m.lan }))
+    movesList.replaceChildren(renderMoves(moves))
   } else {
     movesList.replaceChildren();
   }
@@ -66,137 +68,201 @@ const chessPiecesUnicode = {
 
 const loadLocalStorage = () => {
   let bestMoves = [];
-    const localStorageData = localStorage.getItem('best_moves');
-    if (localStorageData) {
-      try {
-        bestMoves = JSON.parse(localStorageData);
-      }
-      catch (e) {
-      }
+  const localStorageData = localStorage.getItem('best_moves');
+  if (localStorageData) {
+    try {
+      bestMoves = JSON.parse(localStorageData);
     }
-    return bestMoves;
+    catch (e) {
+    }
+  }
+  return bestMoves;
 }
+
+
 
 
 class ScenariosComponent extends HTMLElement {
 
   state = {
-    currentFen: null,
-    currentBoard: null,
-    currentTurn: null
+    currentFen: new BehaviorSubject("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"),
+    currentBoard: new BehaviorSubject(null),
+    currentTurn: new BehaviorSubject(null),
+    storedScenarios: new BehaviorSubject([]),
+    loadedScenarios: new BehaviorSubject([]),
+    displayFen: new BehaviorSubject("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"),
   }
 
+
+
+
   async connectedCallback() {
+
+
     // Estilos
     const styleElement = document.createElement("style");
     styleElement.textContent = style;
     this.append(styleElement);
+
+
     // Contenido
     const templateWrapper = document.createElement("div");
     templateWrapper.innerHTML = template;
     this.append(templateWrapper.querySelector(".main-content").cloneNode(true));
     const scenariosListDiv = this.querySelector("#scenariosList");
+    const storedScenarios = this.querySelector("#storedScenarios");
+    const loadedScenarios = this.querySelector("#loadedScenarios");
     const scenariosRepresentation = this.querySelector("#representation");
-    const board = this.querySelector("chessmarro-board");
-    this.state.currentBoard = board.board;
-    this.state.currentTurn= "w";
     const movesList = this.querySelector("#moves-list");
-    // Tabla de escenarios
-    const scenariosListTable = templateWrapper.querySelector("#scenariosListTable").content.querySelector("table");
-    const scenariosListTableTbody = scenariosListTable.querySelector("tbody");
 
-    // Escenarios guardados
+    //Datos
+    const board = this.querySelector("chessmarro-board");
     const storedBestMoves = loadLocalStorage();
-    scenariosListTableTbody.replaceChildren(...fensToRows(storedBestMoves));
 
-    scenariosListDiv.addEventListener("mouseover", (event) => {
-      if (event.target.tagName === "TD") {
-        const fen = event.target.dataset.fen;
-        board.board = setFen(fen);
-        board.refresh();
-        renderMovesDiv(movesList, fen);
-      }
+    this.state.currentBoard.next(board.board);
+    this.state.currentTurn.next(board.turn);
+    this.state.storedScenarios.next(storedBestMoves);
+
+
+    // Tabla de escenarios guardados
+    const scenariosListTable = templateWrapper.querySelector("#scenariosListTable").content.querySelector("table").cloneNode(true);
+    const scenariosListTableTbody = scenariosListTable.querySelector("tbody");
+    storedScenarios.append(scenariosListTable);
+
+    this.state.storedScenarios.subscribe((storedBestMoves) => {
+      scenariosListTableTbody.replaceChildren(...fensToRows(storedBestMoves));
     });
 
-    scenariosListDiv.addEventListener("mouseout", (event) => {
-      if (event.target.tagName === "TD") {
-        const fen = this.state.currentFen;
-        board.board = this.state.currentBoard;
-        board.refresh();
-        renderMovesDiv(movesList, fen);
-      }
-    });
+    // Escenarios cargados
+    const loadedScenariosListTable = templateWrapper.querySelector("#scenariosListTable").content.querySelector("table").cloneNode(true);
+    const loadedscenariosListTableTbody = loadedScenariosListTable.querySelector("tbody");
+    loadedScenarios.append(loadedScenariosListTable);
 
-    scenariosListDiv.addEventListener("click", (event) => {
-      if (event.target.tagName === "TD") {
-        this.state.currentFen = event.target.dataset.fen;
-        board.board = setFen(this.state.currentFen);
-        this.state.currentBoard = board.board;
-        board.refresh();
-        const chess = new Chess(this.state.currentFen, { skipValidation: true });
-        this.state.currentTurn = chess.turn();
-
-        renderMovesDiv(movesList, this.state.currentFen);
-      }
+    this.state.loadedScenarios.subscribe((loadedScenarios) => {
+      loadedscenariosListTableTbody.replaceChildren(...fensToRows(loadedScenarios));
     });
 
 
-    let previewTimeout = null;
-    movesList.addEventListener("mouseover", (event) => {
-      if (event.target.tagName === "SPAN" && event.target.dataset.move) {
-        // 1. Cancelar cualquier reseteo pendiente y restaurar el tablero.
-        clearTimeout(previewTimeout);
-        board.board = this.state.currentBoard;
-        board.refresh();
-
-        // 2. Animar el nuevo movimiento.
-        const [x, y, X, Y] = uciToMove(event.target.dataset.move);
-        board.movePiece([x, y], [X, Y], 0.3);
-
-        // 3. Programar el reseteo al salir del span.
-        event.target.addEventListener("mouseout", () => {
-          previewTimeout = setTimeout(() => {
-            board.movePiece([X, Y], [x, y], 0.3, () => {
-              board.board = this.state.currentBoard;
-              board.refresh();
-            });
-          }, 50); // Un pequeño delay para que la transición a otro span sea fluida.
-        }, { once: true });
-      }
+    this.state.displayFen.subscribe((fen) => {
+      const boardData = setFen(fen);
+      board.board = boardData;
+      board.refresh();
+      renderMovesDiv(movesList, fen);
     });
+
+    fromEvent(scenariosListDiv, "mouseover").pipe(
+      map(event => event.target),
+      filter(target => target.tagName === "TD" && target.dataset.fen),
+      map(target => target.dataset.fen)
+    ).subscribe(fen => {
+      this.state.displayFen.next(fen);
+    });
+
+    fromEvent(scenariosListDiv, "mouseout").pipe(
+      filter(event => event.target.tagName === "TD")
+    ).subscribe(() => {
+      const fen = this.state.currentFen.getValue();
+      this.state.displayFen.next(fen);
+    });
+
+
+    fromEvent(scenariosListDiv, "click").pipe(
+      filter(event => event.target.tagName === "TD")
+    ).subscribe((event) => {
+      const fen = event.target.dataset.fen;
+      this.state.currentFen.next(fen);
+      this.state.displayFen.next(fen);
+      this.state.currentBoard.next(setFen(fen));
+      const chess = new Chess(fen, { skipValidation: true });
+      this.state.currentTurn.next(chess.turn());
+    });
+
+    const promisifyMovePiece = ([x, y], [X, Y], time) =>{
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          board.movePiece([x, y], [X, Y], 0.3);
+          resolve([x, y, X, Y]);
+        }, time * 1000);
+      });
+    
+    }
+
+
+    const $pieceMoves = new Subject();
+    $pieceMoves
+      .pipe(
+        tap((move) => {console.log(move);
+        }),
+        concatMap((moves) => {
+          if (moves) {
+            const [x, y, X, Y] = moves;
+            // Asumimos que movePiece ahora devuelve una promesa que se resuelve al final de la animación.
+            return promisifyMovePiece([x, y], [X, Y], 0.3);
+          }
+          // Si es null, reseteamos el tablero y devolvemos un observable que se completa inmediatamente.
+          return of(this.state.displayFen.next(this.state.currentFen.getValue()));
+        }),
+        tap((move) => {console.log("   ",move);}),
+      )
+      .subscribe();
+
+
+
+    fromEvent(movesList, "mouseover").pipe(
+      map(event => event.target),
+      filter(target => target.tagName === "SPAN" && target.dataset.move),
+      switchMap(target => {
+        const move = uciToMove(target.dataset.move);
+        const [x, y, X, Y] = move;
+        const reverseMove = [X, Y, x, y]; // Movimiento inverso para la animación de vuelta.
+
+        const mouseout$ = fromEvent(target, 'mouseout').pipe(map(() => reverseMove), take(1));
+        // Emitimos null para resetear, luego el movimiento, y finalmente el mouseout$ se encargará de la vuelta.
+        return concat(of(null), of(move), mouseout$);
+      })
+    ).subscribe($pieceMoves);
+
+
+    
+    const makeMove = (move) => {
+      const [x, y, X, Y] = uciToMove(move);
+      board.movePiece([x, y], [X, Y], 0.3);
+      // board.refresh();
+      const chess = new Chess(this.state.currentFen, { skipValidation: true });
+      chess.move(move);
+      const fen = chess.fen();
+      this.state.currentFen.next(fen);
+      this.state.currentBoard.next(setFen(fen));
+      this.state.currentTurn.next(chess.turn());
+
+      renderMovesDiv(movesList, fen);
+      storedBestMoves.push({ fen, move });
+      localStorage.setItem('best_moves', JSON.stringify(storedBestMoves));
+      scenariosListTableTbody.replaceChildren(...fensToRows(storedBestMoves));
+    }
 
     movesList.addEventListener("click", (event) => {
       if (event.target.tagName === "SPAN" && event.target.dataset.move) {
-
-        const [x, y, X, Y] = uciToMove(event.target.dataset.move);
-        board.movePiece([x, y], [X, Y], 0.3);
-        board.refresh();
-
-        //this.state.currentBoard = board.board;
-         const chess = new Chess(this.state.currentFen, { skipValidation: true });
-         chess.move(event.target.dataset.move);
-         this.state.currentFen = chess.fen();
-         this.state.currentBoard = setFen(this.state.currentFen);
-
-        this.state.currentTurn = chess.turn();
-        const fen = this.state.currentFen;
-    
-        renderMovesDiv(movesList, fen);
-        storedBestMoves.push({fen, move: event.target.dataset.move});
-        localStorage.setItem('best_moves', JSON.stringify(storedBestMoves));
-        scenariosListTableTbody.replaceChildren(...fensToRows(storedBestMoves));
+        makeMove(event.target.dataset.move);
       }
     });
 
-    
-    scenariosListDiv.append(scenariosListTable);
-    
+
+
+
 
     document.querySelector('#load-defaults-button').addEventListener('click', async () => {
       const response = await fetch("chess_endgames.csv");
       const data = await response.text();
-      const rows = data.split("\n").map((r)=>({fen: r, move: null}));
-      scenariosListTableTbody.replaceChildren(...fensToRows([...storedBestMoves,...rows]));
+      const rows = data.split("\n").map((r) => ({ fen: r, move: null }));
+      loadedscenariosListTableTbody.replaceChildren(...fensToRows([...rows]));
+    });
+
+
+    board.addEventListener("chessmarro-move", e => {
+      console.log(e);
+      makeMove(e.detail.uci);
+
     });
 
   }
