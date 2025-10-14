@@ -209,7 +209,8 @@ class ScenariosComponent extends HTMLElement {
 
 
     fromEvent(movesList, "mouseover").pipe(
-      map(event => event.target),
+      map(event => event.target.closest('.tag')),
+      tap(target => console.log(target)),
       filter(target => target.tagName === "SPAN" && target.dataset.move),
       switchMap(target => {
         const move = uciToMove(target.dataset.move);
