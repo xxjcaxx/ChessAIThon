@@ -2,7 +2,7 @@ import { setFen, getFen } from "chessmarro-board";
 import template from "./scenariosTemplate.html?raw"
 import style from "./style.css?inline"
 import { Chess } from 'chess.js'
-import { BehaviorSubject, Subject, fromEvent, map, filter, tap, switchMap, of, throttleTime, asyncScheduler, concat, take, concatMap } from 'rxjs';
+import { BehaviorSubject, Subject, fromEvent, map, filter, tap, merge, switchMap, of, throttleTime, asyncScheduler, concat, take, concatMap, distinctUntilChanged } from 'rxjs';
 
 
 
@@ -23,7 +23,40 @@ const renderMoves = (moves) => {
   wrapper.innerHTML = '<div class="tags">' + moves.map((move) => `
   <span data-move="${move.lan}"class="tag is-light is-clickable"><span class="is-size-4">${move.piece}</span>${move.lan}</span>
   `).join('') + '</ul>';
-  return wrapper.firstChild;
+  //const moveDiv = wrapper.firstChild;
+
+  const moveDiv = document.createElement('div');
+  moveDiv.classList.add('tags');
+  const moveSpans = moves.map(move => {
+    const moveSpan = document.createElement('span');
+    moveSpan.classList.add('tag', 'is-light', 'is-clickable');
+    moveSpan.dataset.move = move.lan;
+    moveSpan.innerHTML = `<span class="is-size-4">${move.piece}</span>${move.lan}`;
+    moveSpan.addEventListener('mouseenter', (e) => {
+      if (e.target === moveSpan) {
+        const customEvent = new CustomEvent('enterMove', {
+          bubbles: true,  // para que se propague
+          detail: { message: move.lan }
+        });
+        moveSpan.dispatchEvent(customEvent);
+      }
+    });
+    moveSpan.addEventListener('mouseout', (e) => {
+      if (e.target === moveSpan) {
+        const customEvent = new CustomEvent('outMove', {
+          bubbles: true,  // para que se propague
+          detail: { message: move.lan }
+        });
+        moveSpan.dispatchEvent(customEvent);
+      }
+    });
+    return moveSpan;
+  });
+
+  moveDiv.append(...moveSpans);
+
+
+  return moveDiv;
 }
 
 const renderMovesDiv = (movesList, fen) => {
@@ -142,6 +175,14 @@ class ScenariosComponent extends HTMLElement {
       loadedscenariosListTableTbody.replaceChildren(...fensToRows(loadedScenarios));
     });
 
+    const resetDisplayFen = () => {
+      console.log("displa");
+
+      const fen = this.state.currentFen.getValue();
+      this.state.displayFen.next(fen);
+    }
+
+
 
     this.state.displayFen.subscribe((fen) => {
       const boardData = setFen(fen);
@@ -161,8 +202,10 @@ class ScenariosComponent extends HTMLElement {
     fromEvent(scenariosListDiv, "mouseout").pipe(
       filter(event => event.target.tagName === "TD")
     ).subscribe(() => {
+      /*
       const fen = this.state.currentFen.getValue();
-      this.state.displayFen.next(fen);
+      this.state.displayFen.next(fen);*/
+      resetDisplayFen();
     });
 
 
@@ -177,54 +220,57 @@ class ScenariosComponent extends HTMLElement {
       this.state.currentTurn.next(chess.turn());
     });
 
-    const promisifyMovePiece = ([x, y], [X, Y], time) =>{
+    const promisifyMovePiece = ([x, y], [X, Y], time) => {
       return new Promise((resolve) => {
         setTimeout(() => {
           board.movePiece([x, y], [X, Y], 0.3);
           resolve([x, y, X, Y]);
         }, time * 1000);
       });
-    
+
     }
 
+    const currentMove$ = new BehaviorSubject(null);
 
-    const $pieceMoves = new Subject();
-    $pieceMoves
+    function getPieceUnderMouse(event) {
+      const el = document.elementFromPoint(event.clientX, event.clientY);
+      if (!el) return null;
+      if (el.classList.contains('tag')) {
+       const moveStr = el.dataset.move;
+        if (!moveStr) return null;
+
+        const move = uciToMove(moveStr);
+        return move;
+      }
+      return null;
+    }
+
+    fromEvent(document, 'mousemove')
       .pipe(
-        tap((move) => {console.log(move);
+        map(event => {
+          const move = getPieceUnderMouse(event);
+          return move
+            ? move
+            : null;
         }),
-        concatMap((moves) => {
-          if (moves) {
-            const [x, y, X, Y] = moves;
-            // Asumimos que movePiece ahora devuelve una promesa que se resuelve al final de la animación.
-            return promisifyMovePiece([x, y], [X, Y], 0.3);
-          }
-          // Si es null, reseteamos el tablero y devolvemos un observable que se completa inmediatamente.
-          return of(this.state.displayFen.next(this.state.currentFen.getValue()));
-        }),
-        tap((move) => {console.log("   ",move);}),
+        distinctUntilChanged((a, b) => JSON.stringify(a) === JSON.stringify(b))
+      )
+      .subscribe(currentMove$);
+
+    currentMove$
+      .pipe(
+        tap(move => console.log(JSON.stringify(move))),
+        switchMap(move =>
+          move
+            ? promisifyMovePiece([move[0], move[1]], [move[2], move[3]], 0.3)
+            : of(null).pipe(tap(() => {resetDisplayFen()}))
+        ),
       )
       .subscribe();
 
 
 
-    fromEvent(movesList, "mouseover").pipe(
-      map(event => event.target.closest('.tag')),
-      tap(target => console.log(target)),
-      filter(target => target.tagName === "SPAN" && target.dataset.move),
-      switchMap(target => {
-        const move = uciToMove(target.dataset.move);
-        const [x, y, X, Y] = move;
-        const reverseMove = [X, Y, x, y]; // Movimiento inverso para la animación de vuelta.
 
-        const mouseout$ = fromEvent(target, 'mouseout').pipe(map(() => reverseMove), take(1));
-        // Emitimos null para resetear, luego el movimiento, y finalmente el mouseout$ se encargará de la vuelta.
-        return concat(of(null), of(move), mouseout$);
-      })
-    ).subscribe($pieceMoves);
-
-
-    
     const makeMove = (move) => {
       const [x, y, X, Y] = uciToMove(move);
       board.movePiece([x, y], [X, Y], 0.3);
