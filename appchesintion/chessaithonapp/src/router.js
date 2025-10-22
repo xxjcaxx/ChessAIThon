@@ -6,10 +6,13 @@ const routes = new Map([
 ])
 
 const router = (hash) => {
-
-    if(routes.has(hash)){
-        const {component} = routes.get(hash);
+    console.log(hash);
+    const [hashname,id] = hash.split('/'); 
+    
+    if(routes.has(hashname)){
+        const {component} = routes.get(hashname);
         const webComponent = document.createElement(component);
+        webComponent.identificator = id;
         document.querySelector('#content').replaceChildren(webComponent);
     }
 }

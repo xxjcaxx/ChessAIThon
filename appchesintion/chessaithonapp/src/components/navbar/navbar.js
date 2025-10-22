@@ -19,9 +19,10 @@ class NavbarComponent extends HTMLElement {
       <div class="navbar-start">
       <a class="navbar-item" href="#home" class="is-active">Home</a>
       <a class="navbar-item" href="#scenarios">Chess scenarios</a>
-      <a class="navbar-item">Play Chess</a>
-      <a class="navbar-item">Chess representation</a>
-      <a class="navbar-item">Chess AI</a>
+      <a class="navbar-item"  href="#play">Play Chess</a>
+      <a class="navbar-item"  href="#representation">Chess representation</a>
+      <a class="navbar-item"  href="#ai">Chess AI</a>
+      <a class="navbar-item" href="https://chessaithon.pixel-online.org/">About</a>
       </div>
 
     </div>

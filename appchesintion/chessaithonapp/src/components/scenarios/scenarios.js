@@ -1,9 +1,10 @@
 import { setFen, getFen } from "chessmarro-board";
 import template from "./scenariosTemplate.html?raw"
 import style from "./style.css?inline"
-import { Chess } from 'chess.js'
+import { Chess , validateFen} from 'chess.js'
 import { BehaviorSubject, Subject, fromEvent, map, filter, tap, merge, switchMap, of, throttleTime, asyncScheduler, concat, take, concatMap, distinctUntilChanged } from 'rxjs';
-import { uciToMove, chessPiecesUnicode} from "../../chessUtils";
+import { uciToMove, chessPiecesUnicode } from "../../chessUtils";
+
 
 
 const fensToRows = (rows) => {
@@ -18,12 +19,14 @@ const fensToRows = (rows) => {
 
 }
 
+
+////////// MOVES
+
 const renderMoves = (moves) => {
   const wrapper = document.createElement('div');
   wrapper.innerHTML = '<div class="tags">' + moves.map((move) => `
   <span data-move="${move.lan}"class="tag is-light is-clickable"><span class="is-size-4">${move.piece}</span>${move.lan}</span>
   `).join('') + '</ul>';
-  //const moveDiv = wrapper.firstChild;
 
   const moveDiv = document.createElement('div');
   moveDiv.classList.add('tags');
@@ -69,6 +72,9 @@ const renderMovesDiv = (movesList, fen) => {
 
 }
 
+
+//////////////// Localstorage
+
 const loadLocalStorage = () => {
   let bestMoves = [];
   const localStorageData = localStorage.getItem('best_moves');
@@ -94,12 +100,20 @@ class ScenariosComponent extends HTMLElement {
     storedScenarios: new BehaviorSubject([]),
     loadedScenarios: new BehaviorSubject([]),
     displayFen: new BehaviorSubject("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"),
+    movesHistory: new BehaviorSubject([]),
   }
 
-
-
-
   async connectedCallback() {
+
+    const identificator = this.identificator;
+    console.log(identificator);
+    if (identificator) {
+      const fen = decodeURIComponent(identificator)
+      if (validateFen(fen).ok) {
+        this.state.currentFen.next(fen);
+        this.state.displayFen.next(fen);
+      }
+    }
 
 
     // Estilos
@@ -117,6 +131,8 @@ class ScenariosComponent extends HTMLElement {
     const loadedScenarios = this.querySelector("#loadedScenarios");
     const scenariosRepresentation = this.querySelector("#representation");
     const movesList = this.querySelector("#moves-list");
+    const historyList = this.querySelector('#movesHistoryList');
+    const currentFenDisplay = this.querySelector('#currentFen');
 
     //Datos
     const board = this.querySelector("chessmarro-board");
@@ -145,14 +161,13 @@ class ScenariosComponent extends HTMLElement {
       loadedscenariosListTableTbody.replaceChildren(...fensToRows(loadedScenarios));
     });
 
-    const resetDisplayFen = () => {
-      console.log("displa");
 
+
+    // 
+    const resetDisplayFen = () => {
       const fen = this.state.currentFen.getValue();
       this.state.displayFen.next(fen);
     }
-
-
 
     this.state.displayFen.subscribe((fen) => {
       const boardData = setFen(fen);
@@ -160,6 +175,12 @@ class ScenariosComponent extends HTMLElement {
       board.refresh();
       renderMovesDiv(movesList, fen);
     });
+
+    this.state.currentFen.subscribe(fen=>{
+      currentFenDisplay.innerHTML = `Link: <a href="#scenarios/${encodeURIComponent(fen)}">${fen}</a>`
+
+    });
+
 
     fromEvent(scenariosListDiv, "mouseover").pipe(
       map(event => event.target),
@@ -172,9 +193,6 @@ class ScenariosComponent extends HTMLElement {
     fromEvent(scenariosListDiv, "mouseout").pipe(
       filter(event => event.target.tagName === "TD")
     ).subscribe(() => {
-      /*
-      const fen = this.state.currentFen.getValue();
-      this.state.displayFen.next(fen);*/
       resetDisplayFen();
     });
 
@@ -188,6 +206,7 @@ class ScenariosComponent extends HTMLElement {
       this.state.currentBoard.next(setFen(fen));
       const chess = new Chess(fen, { skipValidation: true });
       this.state.currentTurn.next(chess.turn());
+      this.state.movesHistory.next([]);
     });
 
     const promisifyMovePiece = ([x, y], [X, Y], time) => {
@@ -195,7 +214,7 @@ class ScenariosComponent extends HTMLElement {
         setTimeout(() => {
           board.movePiece([x, y], [X, Y], 0.3);
           resolve([x, y, X, Y]);
-        }, time * 1000);
+        }, time * 400);
       });
 
     }
@@ -206,7 +225,7 @@ class ScenariosComponent extends HTMLElement {
       const el = document.elementFromPoint(event.clientX, event.clientY);
       if (!el) return null;
       if (el.classList.contains('tag')) {
-       const moveStr = el.dataset.move;
+        const moveStr = el.dataset.move;
         if (!moveStr) return null;
 
         const move = uciToMove(moveStr);
@@ -229,11 +248,11 @@ class ScenariosComponent extends HTMLElement {
 
     currentMove$
       .pipe(
-        tap(move => console.log(JSON.stringify(move))),
+        //tap(move => console.log(JSON.stringify(move))),
         concatMap(move =>
           move
             ? promisifyMovePiece([move[0], move[1]], [move[2], move[3]], 0.3)
-            : of(null).pipe(tap(() => {resetDisplayFen()}))
+            : of(null).pipe(tap(() => { resetDisplayFen() }))
         ),
       )
       .subscribe();
@@ -245,12 +264,15 @@ class ScenariosComponent extends HTMLElement {
       const [x, y, X, Y] = uciToMove(move);
       board.movePiece([x, y], [X, Y], 0.3);
       // board.refresh();
-      const chess = new Chess(this.state.currentFen, { skipValidation: true });
+      console.log(move);
+
+      const chess = new Chess(this.state.currentFen.getValue(), { skipValidation: true });
       chess.move(move);
       const fen = chess.fen();
       this.state.currentFen.next(fen);
       this.state.currentBoard.next(setFen(fen));
       this.state.currentTurn.next(chess.turn());
+      this.state.movesHistory.next([...this.state.movesHistory.getValue(), { fen, move }]);
 
       renderMovesDiv(movesList, fen);
       storedBestMoves.push({ fen, move });
@@ -265,9 +287,6 @@ class ScenariosComponent extends HTMLElement {
     });
 
 
-
-
-
     document.querySelector('#load-defaults-button').addEventListener('click', async () => {
       const response = await fetch("chess_endgames.csv");
       const data = await response.text();
@@ -279,9 +298,19 @@ class ScenariosComponent extends HTMLElement {
     board.addEventListener("chessmarro-move", e => {
       console.log(e);
       makeMove(e.detail.uci);
-
     });
 
+    this.state.movesHistory.subscribe(history => {
+      historyList.innerHTML = '';
+      history.forEach(h => {
+        const li = document.createElement('li');
+        li.textContent = `${h.fen} - ${h.move}`
+        historyList.append(li);
+      });
+    });
+
+
+    // fin connected callback
   }
 
 
