@@ -3,7 +3,7 @@ import template from "./scenariosTemplate.html?raw"
 import style from "./style.css?inline"
 import { Chess } from 'chess.js'
 import { BehaviorSubject, Subject, fromEvent, map, filter, tap, merge, switchMap, of, throttleTime, asyncScheduler, concat, take, concatMap, distinctUntilChanged } from 'rxjs';
-
+import { uciToMove, chessPiecesUnicode} from "../../chessUtils";
 
 
 const fensToRows = (rows) => {
@@ -54,8 +54,6 @@ const renderMoves = (moves) => {
   });
 
   moveDiv.append(...moveSpans);
-
-
   return moveDiv;
 }
 
@@ -70,34 +68,6 @@ const renderMovesDiv = (movesList, fen) => {
   }
 
 }
-
-
-const uciToMove = (uci) => {
-  const letters = [" ", "a", "b", "c", "d", "e", "f", "g", "h", " "];
-  const [oy, ox, dy, dx] = uci.split("");
-  return [
-    letters.indexOf(oy) - 1,
-    8 - parseInt(ox),
-    letters.indexOf(dy) - 1,
-    8 - parseInt(dx),
-  ];
-};
-
-
-const chessPiecesUnicode = {
-  'P': '♙', // Peón blanco
-  'N': '♘', // Caballo blanco
-  'B': '♗', // Alfil blanco
-  'R': '♖', // Torre blanca
-  'Q': '♕', // Reina blanca
-  'K': '♔', // Rey blanco
-  'p': '♟', // Peón negro
-  'n': '♞', // Caballo negro
-  'b': '♝', // Alfil negro
-  'r': '♜', // Torre negra
-  'q': '♛', // Reina negra
-  'k': '♚'  // Rey negro
-};
 
 const loadLocalStorage = () => {
   let bestMoves = [];
@@ -260,7 +230,7 @@ class ScenariosComponent extends HTMLElement {
     currentMove$
       .pipe(
         tap(move => console.log(JSON.stringify(move))),
-        switchMap(move =>
+        concatMap(move =>
           move
             ? promisifyMovePiece([move[0], move[1]], [move[2], move[3]], 0.3)
             : of(null).pipe(tap(() => {resetDisplayFen()}))
