@@ -4,18 +4,9 @@ background: linear-gradient(45deg, #0f255fff, #0f255fff, #602f83ff);
 */
 }
 
-
 #scenariosList{
     overflow: auto;
     height: 100vh;
-}
-
-.board-container {
-    width:  75vh;
-}
-
-.moves-list{
-    display: inline-block; list-style: none;padding:0;
 }
 
 .scenariosListDiv{

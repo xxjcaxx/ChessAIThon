@@ -1,4 +1,4 @@
-export {chessPiecesUnicode,uciToMove}
+export {chessPiecesUnicode,uciToMove,loadLocalStorage}
 
 const chessPiecesUnicode = {
   'P': '♙', // Peón blanco
@@ -25,3 +25,16 @@ const uciToMove = (uci) => {
     8 - parseInt(dx),
   ];
 };
+
+const loadLocalStorage = () => {
+  let bestMoves = [];
+  const localStorageData = localStorage.getItem('best_moves');
+  if (localStorageData) {
+    try {
+      bestMoves = JSON.parse(localStorageData);
+    }
+    catch (e) {
+    }
+  }
+  return bestMoves;
+}
