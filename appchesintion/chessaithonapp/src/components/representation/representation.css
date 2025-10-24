@@ -1,0 +1,38 @@
+.boardRep {
+    display: grid;
+    grid-template-columns: repeat(8, 20px);
+}
+
+  .cellRep {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+  }
+
+  .blackRep{
+    background-color: #b58863;
+  }
+
+  .whiteRep{
+    background-color: #f0d9b5;
+  }
+
+
+  .activeRep{
+    font-weight: bolder;
+    color: black;
+  }
+
+  .innactiveRep{
+    color: #ffffff55;
+  }
+
+
+  .layers{
+
+      display: grid;
+      grid-template-columns: repeat(6, 160px);
+      gap: 10px;}

@@ -3,6 +3,8 @@ export { routes, router }
 const routes = new Map([
     ["#home", { component: "chess-home" }],
     ["#scenarios", { component: "chess-scenarios" }],
+    ["#play", { component: "chess-play" }],
+    ["#representation", { component: "chess-representation" }],
 ])
 
 const router = (hash) => {

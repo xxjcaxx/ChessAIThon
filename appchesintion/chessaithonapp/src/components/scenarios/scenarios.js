@@ -1,9 +1,9 @@
 import { setFen, getFen } from "chessmarro-board";
 import template from "./scenariosTemplate.html?raw"
 import style from "./style.css?inline"
-import { Chess , validateFen} from 'chess.js'
+import { Chess, validateFen } from 'chess.js'
 import { BehaviorSubject, Subject, fromEvent, map, filter, tap, merge, switchMap, of, throttleTime, asyncScheduler, concat, take, concatMap, distinctUntilChanged } from 'rxjs';
-import { uciToMove, chessPiecesUnicode, loadLocalStorage } from "../../chessUtils";
+import { uciToMove, chessPiecesUnicode, loadLocalStorage, decodeIdentificator } from "../../chessUtils";
 
 
 const fensToRows = (rows) => {
@@ -11,7 +11,10 @@ const fensToRows = (rows) => {
     (fen) => {
       const row = document.createElement("tr");
       row.classList.add("is-primary", "is-clickable");
-      row.innerHTML = `<td data-fen="${fen.fen}">${fen.fen} </td>${fen.move ? `<td data-move="${fen.move}">${fen.move}</td>` : "<td></td>"}`;
+      row.innerHTML = `
+      <td data-fen="${fen.fen}">${fen.fen} </td>
+      ${fen.move ? `<td data-move="${fen.move}">${fen.move}</td>` : "<td></td>"} 
+      <td><span data-action="delete" data-fen="${fen.fen}">🗑</span><span data-action="representationLink" data-fen="${fen.fen}">🧊</span></td>`;
       return row;
     }
   );
@@ -31,14 +34,12 @@ class ScenariosComponent extends HTMLElement {
   async connectedCallback() {
 
     const identificator = this.identificator;
-    console.log(identificator);
-    if (identificator) {
-      const fen = decodeURIComponent(identificator)
-      if (validateFen(fen).ok) {
+    const fen = decodeIdentificator(identificator);
+    if (fen) {
         this.state.currentFen.next(fen);
         this.state.displayFen.next(fen);
-      }
     }
+  
 
 
     // Estilos
@@ -62,14 +63,14 @@ class ScenariosComponent extends HTMLElement {
     //Board
     const board = document.createElement("chess-board");
     board.dataset.fen = this.state.currentFen.getValue();
-      // Board observables
+    // Board observables
     board.state.currentFen = this.state.currentFen;
     board.state.displayFen = this.state.displayFen;
 
     const boardContainer = this.querySelector("#boardContainer");
     boardContainer.append(board);
 
-  
+
 
 
     const storedBestMoves = loadLocalStorage();
@@ -95,7 +96,7 @@ class ScenariosComponent extends HTMLElement {
       loadedscenariosListTableTbody.replaceChildren(...fensToRows(loadedScenarios));
     });
 
-    
+
     const resetDisplayFen = () => {
       const fen = this.state.currentFen.getValue();
       this.state.displayFen.next(fen);
@@ -124,6 +125,28 @@ class ScenariosComponent extends HTMLElement {
       this.state.currentFen.next(fen);
       this.state.displayFen.next(fen);
     });
+
+    fromEvent(scenariosListDiv, "click").pipe(
+      filter(event => event.target.tagName === "SPAN" && event.target.dataset.action === "representationLink")
+    ).subscribe((event) => {
+      const fen = event.target.dataset.fen;
+      window.location.href = `#representation/${encodeURIComponent(fen)}`;
+    });
+
+    fromEvent(scenariosListDiv, "click").pipe(
+       filter(event => event.target.tagName === "SPAN" && event.target.dataset.action === "delete")
+    ).subscribe((event) => {
+      console.log("Borrar: ",event.target.dataset.fen);
+      const storedScenarios = this.state.storedScenarios.getValue();
+      const index = storedScenarios.findIndex(fen => fen.fen === event.target.dataset.fen);
+      if (index !== -1) {
+        storedScenarios.splice(index, 1);
+        this.state.storedScenarios.next(storedScenarios);
+        localStorage.setItem('best_moves', JSON.stringify(storedScenarios));
+      }
+    
+    });
+
 
 
     fromEvent(this, "makeMove").subscribe((event) => {

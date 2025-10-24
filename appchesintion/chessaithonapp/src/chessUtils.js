@@ -1,4 +1,5 @@
-export {chessPiecesUnicode,uciToMove,loadLocalStorage}
+export {chessPiecesUnicode,uciToMove,loadLocalStorage, decodeIdentificator}
+import { Chess, validateFen } from 'chess.js'
 
 const chessPiecesUnicode = {
   'P': '♙', // Peón blanco
@@ -38,3 +39,26 @@ const loadLocalStorage = () => {
   }
   return bestMoves;
 }
+
+
+const decodeIdentificator = (identificator) => {
+    console.log(identificator);
+    if (identificator) {
+      let fen = decodeURIComponent(identificator);
+      const fenArray = fen.split('');
+      if(fenArray.at(-1)==='0'){
+        fenArray[fenArray.length-1]='1'
+        fen = fenArray.join('');
+      }
+
+      if (validateFen(fen).ok) {
+        return fen;
+      }
+      else{
+        console.log(validateFen(fen).error);
+        
+        return null;
+      }
+    }
+    return null;
+  }

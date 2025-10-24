@@ -1,0 +1,58 @@
+<div class="container mt-6">
+  <h2 class="title has-text-centered has-text-white ">Player Configuration</h2>
+
+
+  <form class="box has-background-dark" style="max-width: 600px; margin: 0 auto;">
+    <!-- PLAYER 1 -->
+    <div class="field">
+      <label class="label has-text-white">Player 1</label>
+      <div class="control">
+        <div class="select is-fullwidth">
+          <select id="player1-select" >
+            <option value="human">Human</option>
+            <option value="ai">AI</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="player1-api" class="field mt-2 is-hidden">
+        <label class="label has-text-white">Player 1 AI API URL</label>
+        <div class="control">
+          <input class="input" type="url" placeholder="https://example.com/api/ai-player1">
+        </div>
+      </div>
+    </div>
+
+    <!-- PLAYER 2 -->
+    <div class="field">
+      <label class="label has-text-white">Player 2</label>
+      <div class="control">
+        <div class="select is-fullwidth">
+          <select id="player2-select" >
+            <option value="human">Human</option>
+            <option value="ai">AI</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="player2-api" class="field mt-2 is-hidden">
+        <label class="label has-text-white">Player 2 AI API URL</label>
+        <div class="control">
+          <input class="input" type="url" placeholder="https://example.com/api/ai-player2">
+        </div>
+      </div>
+    </div>
+
+    <!-- SUBMIT BUTTON -->
+    <div class="field has-text-centered mt-5">
+      <div class="control">
+        <button class="button is-link">Start Game</button>
+      </div>
+    </div>
+  </form>
+
+</div>
+
+<script>
+
+</script>

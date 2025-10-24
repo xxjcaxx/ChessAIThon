@@ -1,7 +1,10 @@
 import "./components/navbar/navbar.js";
 import "./components/home/home.js";
 import "./components/scenarios/scenarios.js";
-import "./components/board/board.js"
+import "./components/board/board.js";
+import "./components/play/play.js";
+import "./components/players/players.js";
+import "./components/representation/representation.js";
 import { initChessmarroBoard } from "chessmarro-board";
 import { router } from "./router.js";
 
