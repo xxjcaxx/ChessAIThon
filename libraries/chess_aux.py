@@ -9,7 +9,6 @@ def board_to_matrix(board, piece_type):
     matrix = np.zeros((8,8))
 
     for square, piece in piece_map.items():
-        # chess.square_rank y chess.square_file devuelven la fila y columna respectivamente
         rank = chess.square_rank(square)
         file = chess.square_file(square)
         if(piece.piece_type == piece_type):
@@ -57,12 +56,11 @@ codes[(-2,-1)], i = i,  i+1
 codes[(-2,1)], i = i,  i+1
 codes[(-1,2)], i = i,  i+1
     # We avoid pawn promotion because are the same moves and we are looking for 1 best move.
-    # print(len(codes)) 64 moves
+
 
 
 # Receives a board and returns all legal moves in 64x8x8 matrix
 # It uses chess-python to calculate them
-#
 def legal_moves_to_64_8_8(board):
     legal_moves = list(board.legal_moves)
 # Apply the function to each move in the list
