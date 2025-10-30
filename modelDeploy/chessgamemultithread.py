@@ -16,10 +16,10 @@ import multiprocessing as mp
 from multiprocessing import Process, Queue, shared_memory
 from queue import Empty
 from multiprocessing import Manager
+import concurrent.futures
 
-
-# mp.set_start_method('spawn', force=True)
-
+# Función central que realiza la inferencia en la GPU. 
+# Procesa múltiples tableros a la vez (batching) para maximizar la eficiencia de la Conv2D.
 def predict_chess_moves_vectorized(boards_tensor, temperature, model):
     """
     Predice movimientos para un batch de posiciones con Conv2D, usando
@@ -28,7 +28,7 @@ def predict_chess_moves_vectorized(boards_tensor, temperature, model):
     B = boards_tensor.size(0)
     device = boards_tensor.device
 
-    with torch.no_grad():
+    with torch.no_grad(): # Ejecución del modelo. Conv2D espera [Batch, Canales, Alto, Ancho].
         outputs = model(boards_tensor)  # [B, 4096], conv2d espera [B, C, H, W]
 
     # Extraer máscaras legales de los últimos 64 canales
@@ -39,9 +39,11 @@ def predict_chess_moves_vectorized(boards_tensor, temperature, model):
     masked_logits = torch.where(legal_masks, outputs, -float('inf'))
 
     # Softmax con temperatura
+    # Aplica Softmax con la temperatura para introducir aleatoriedad/exploración.
     probs = torch.softmax(masked_logits / temperature, dim=1)  # [B, 4096]
 
     # Samplear movimiento
+    # Usa el muestreo multinomial para elegir un movimiento basado en las probabilidades.
     move_indices = torch.multinomial(probs, num_samples=1).squeeze(1)  # [B]
 
     # Convertir a UCI
@@ -50,7 +52,9 @@ def predict_chess_moves_vectorized(boards_tensor, temperature, model):
     return pred_moves
 
      
-
+# Proceso secundario (Worker) que se ejecuta continuamente en la GPU. 
+# Su única tarea es esperar batches en la input_queue, hacer la predicción rápida 
+# y enviar los resultados a la output_queue.
 def batch_predict_worker(input_queue, output_queue, model, device):
     """
     Worker que recibe batches de boards, construye el tensor completo y predice movimientos.
@@ -59,32 +63,36 @@ def batch_predict_worker(input_queue, output_queue, model, device):
     model.eval()
 
     while True:
-        item = input_queue.get()
+        item = input_queue.get() # Bloquea y espera un nuevo batch
         if item is None:
-            break
+            break # Señal de terminación
 
         boards, ids = item  # boards = [tensor], ids = [task_id]
-        boards_tensor = torch.stack(boards).to(device)
+        boards_tensor = torch.stack(boards).to(device) # Apila los tableros y los mueve a la GPU para el procesamiento vectorizado.
 
         preds = predict_chess_moves_vectorized(boards_tensor,1.2,model)  # lista de jugadas
-        results = list(zip(ids, preds))  # [(task_id, pred), ...]
-        print(results)
-        output_queue.put(results)
+        results = list(zip(ids, preds))  # [(task_id, pred), ...]  # Empareja el ID de tarea con la predicción.
+        #print(results)
+        output_queue.put(results) # Envía el resultado a la cola principal (host)
 
 
 import uuid
 from multiprocessing import Process, Queue
-
+# Proceso secundario dedicado a recibir resultados del worker (output_queue) 
+# y redirigirlos a la cola de respuesta específica de cada cliente (pending dictionary).
 def dispatch_loop(output_queue,pending):
     print("displach loop")
     while True:
-        results = output_queue.get(block=True)
+        results = output_queue.get(block=True) # Espera un resultado del worker
         for tid, pred in results:
-            print(tid,pred)
+            #print(tid,pred)
             if tid in pending:
-                pending[tid].put(pred)
-                del pending[tid]
+                pending[tid].put(pred)  # Despacha la predicción a la cola del cliente original
+                del pending[tid]  # Elimina la tarea pendiente
 
+
+# Clase que implementa el patrón de Batching. Actúa como una interfaz para los clientes,
+# acumulando peticiones hasta alcanzar el tamaño del batch (batch_size) antes de enviarlas a la GPU.
 class ChessBatcher:
     """
     Clase para acumular posiciones y procesarlas en batch usando shared memory.
@@ -94,8 +102,9 @@ class ChessBatcher:
     def __init__(self, batch_size, model, device, manager):
         self.batch_size = batch_size
         self.device = device
-        self.input_queue = Queue()
-        self.output_queue = Queue()
+        self.input_queue = Queue() # Cola para enviar datos al worker (CPU -> GPU Worker)
+        self.output_queue = Queue() # Cola para recibir datos del worker (GPU Worker -> CPU)
+        # Proceso Worker: Ejecuta el worker en paralelo.
         self.worker = Process(target=batch_predict_worker,
                               args=(self.input_queue, self.output_queue, model, device))
         self.worker.start()
@@ -103,21 +112,25 @@ class ChessBatcher:
         
        
         self.manager = manager
+        # Diccionario compartido: Almacena las colas de respuesta individuales por ID de tarea.
         self.pending = self.manager.dict()  # task_id -> Queue de respuesta
         
+        # Proceso Dispatch: Mueve los resultados de la output_queue a la cola individual del cliente.
         self.dispatch_loop_process = Process(target=dispatch_loop, args=(self.output_queue,self.pending), daemon=True)
         self.dispatch_loop_process.start()
 
 
     def add_board(self, board_tensor, response_q=None):
+         # Genera una cola de respuesta si no se proporciona una.
         if response_q is None:
             response_q = self.manager.Queue()
-        task_id = uuid.uuid4().hex
-        self.pending[task_id] = response_q
-        self.current_batch.append((board_tensor, task_id))
+        task_id = uuid.uuid4().hex # Genera un ID único para rastrear la petición.
+        self.pending[task_id] = response_q # Asocia el ID a la cola de respuesta.
+        self.current_batch.append((board_tensor, task_id)) # Acumula la petición.
+        # Verifica si se ha alcanzado el tamaño del batch.
         if len(self.current_batch) >= self.batch_size:
-            self._flush_batch()
-        return response_q
+            self._flush_batch() # Si es así, envía el lote a la GPU.
+        return response_q # Devuelve la cola donde el cliente esperará la respuesta
 
     def _flush_batch(self):
         """
@@ -150,15 +163,16 @@ class ChessBatcher:
         """
         Cierra el worker correctamente.
         """
-        self._flush_batch()
+        self._flush_batch()   # Asegura que las peticiones pendientes sean procesadas
         self.input_queue.put(None)  # Señal de cierre
-        self.worker.join()
+        self.worker.join()  # Espera a que el worker finalice su ejecución
+        self.dispatch_loop_process.terminate()
 
 
-
+"""
 def chessmarro_mcts_predict_chess_move(fen, simulations, model, device):
 
-    best_move = 1234
+    best_move = 12345
 
 
 
@@ -214,15 +228,162 @@ def chessmarro_mcts_predict_chess_move(fen, simulations, model, device):
 
     # Recuperar resultados de cada cola
     for i, q in enumerate(res_queues):
-        print(f"Esperando predicción en cola {i}:", q)
+      #  print(f"Esperando predicción en cola {i}:", q)
         move = q.get()  # se desbloquea automáticamente cuando el worker termine
-        print(f"Recibido {i}:", move)
+       # print(f"Recibido {i}:", move)
 
 
     # Cerrar worker
     batcher.close()
-
+   
 
 #######################################
 
+    return best_move
+
+"""
+
+class MCTSNode:
+    def __init__(self, state, parent=None, move=None):
+        self.state = state  # Current board state
+        self.parent = parent  # Parent node
+        self.move = move  # Move that led to this state
+        self.children = []  # Child nodes (future possible states)
+        self.visits = 0  # Number of times this node has been visited
+        self.value = 0  # Total reward (win/loss/draw) from simulations
+
+    def is_fully_expanded(self):
+        # Returns True if all possible moves have been explored
+        return len(self.children) == sum(1 for _ in self.state.legal_moves)
+
+
+    def best_child(self, exploration_weight=1.4):
+        # Select the child with the best value using UCT (Upper Confidence Bound for Trees)
+        best_value = -float('inf')
+        best_node = None
+        for child in self.children:
+            uct_value = child.value / (child.visits + 1) + exploration_weight * math.sqrt(math.log(self.visits + 1) / (child.visits + 1))
+            if uct_value > best_value:
+                best_value = uct_value
+                best_node = child
+        return best_node
+        
+    def to_dict(self, depth=3):
+        node_dict = {
+            "move": str(self.move),
+            "value": self.value,
+            "visits": self.visits,
+        }
+        if depth > 0 and self.children:
+            node_dict["children"] = [child.to_dict(depth - 1) for child in self.children]
+        return node_dict
+
+    def to_json(self, depth=3):
+        """Retorna el nodo y sus hijos (hasta profundidad depth) en JSON."""
+        return json.dumps(self.to_dict(depth), indent=2)
+
+
+# Define the MCTS algorithm
+class MCTS:
+    def __init__(self, root, chess_batcher, simulations=100, num_workers=4):
+        self.root = root  # Root node
+        self.get_best_function = get_best_function  # Function to get the best move
+        self.simulations = simulations  # Number of MCTS simulations
+        # instancia de ChessBatcher para la inferencia vectorizada.
+        self.chess_batcher = chess_batcher
+        self.num_workers = num_workers # Número de hilos/procesos para MCTS
+
+    def search(self):
+        # Usamos ThreadPoolExecutor porque la mayor parte del tiempo de MCTS 
+        # (selección, expansión, backpropagation) es I/O-bound (esperando el Batcher) o CPU-bound ligero.
+        for _ in range(self.simulations):
+            print(_)
+            # Step 1: Selection
+            node = self._select(self.root)
+
+            # Step 2: Expansion
+            if not node.is_fully_expanded():
+                node = self._expand(node)
+
+            # Step 3: Simulation (Playout)
+            winner = self._simulate(node)
+
+            # Step 4: Backpropagation
+            self._backpropagate(node, winner)
+
+        # Return the best move after simulations
+        print("Children:", len(self.root.children[0].children))
+        print(self.root.to_json())
+        return self.root.best_child(exploration_weight=0).move
+
+    def _select(self, node):
+        # Traverse down the tree to find a leaf node
+        while node.is_fully_expanded():
+            node = node.best_child()  # Use the best child with UCT
+        return node
+
+    def _expand(self, node):
+        # Expand one of the children (possible moves from the current position)
+        legal_moves = node.state.legal_moves
+        for move in legal_moves:
+            new_state = node.state.copy()  # Clone the board to simulate the move
+            new_state.push(move)  # Apply the move
+
+            # Check if this state is already explored
+            if not any(child.move == move for child in node.children):
+                new_node = MCTSNode(new_state, parent=node, move=move)
+                node.children.append(new_node)
+                return new_node
+
+        return node  # Return the node if no expansion was done
+
+    def _simulate(self, node):
+        # Perform a random playout using get_best to simulate moves
+        state = node.state.copy()
+        while not state.is_checkmate() and not state.is_game_over()  and sum(1 for _ in state.legal_moves) > 0:
+            best_move = self.get_best_function(state)  # Use the CNN to predict the best move
+          #  print(best_move, chess.Move.from_uci(best_move), state.legal_moves)
+            if chess.Move.from_uci(best_move) not in state.legal_moves:
+             #   print("Best move is illegal, choosing a random legal move.")
+                best_move = random.choice(list(state.legal_moves)).uci()
+            state.push_uci(best_move)
+        return state.result()  # Return the result: '1-0' for white win, '0-1' for black win, '1/2-1/2' for draw
+
+    def _backpropagate(self, node, winner):
+        # Backpropagate the result of the simulation up the tree
+        while node is not None:
+            node.visits += 1
+            if winner == '1-0':  # White wins
+                node.value += 1
+            elif winner == '0-1':  # Black wins
+                node.value -= 1
+            else:  # Draw
+                node.value += 0.5
+            node = node.parent
+
+
+# Example usage:
+# Assuming we have a chess board state (from the `chess` library) and the `get_best` function
+def get_best_move(board):
+    # Your CNN function that predicts the best move for the given board
+    return predict_chess_move(board.fen(),model, device)
+
+
+
+def chessmarro_mcts_predict_chess_move(fen, simulations, model, device):
+# Set up the initial chess board state
+    board = chess.Board(fen)
+
+    # Create the root node
+    root = MCTSNode(state=board)
+
+    # Initialize MCTS with n simulations
+    mcts = MCTS(root=root, get_best_function=get_best_move, simulations=simulations)
+
+    # Run the MCTS algorithm and get the best move
+    best_move_node = mcts.search()
+    best_move = best_move_node
+
+    # Display the best move
+    print(f"The best move predicted is: {best_move}")
     return best_move
