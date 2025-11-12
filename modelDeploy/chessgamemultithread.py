@@ -8,6 +8,8 @@ import random
 from chessmodel import init_model, predict_chess_move
 import json
 import sys
+import threading
+import time
 
 sys.path.append("./chessintionlib")  
 from chess_aux_c import uci_to_number, number_to_uci, concat_fen_legal, concat_fen_legal_bits, concat_fen_legal_ptr
@@ -17,6 +19,13 @@ from multiprocessing import Process, Queue, shared_memory
 from queue import Empty
 from multiprocessing import Manager
 import concurrent.futures
+
+# Enable cudnn autotuner for better conv performance on fixed-size inputs
+if torch.cuda.is_available():
+    try:
+        torch.backends.cudnn.benchmark = True
+    except Exception:
+        pass
 
 # Función central que realiza la inferencia en la GPU. 
 # Procesa múltiples tableros a la vez (batching) para maximizar la eficiencia de la Conv2D.
@@ -35,19 +44,63 @@ def predict_chess_moves_vectorized(boards_tensor, temperature, model):
     # Flatten del canal y el tablero a 4096
     legal_masks = boards_tensor[:, -64:, :, :].reshape(B, 4096).to(dtype=torch.bool)
 
-    # Poner -inf en posiciones ilegales
-    masked_logits = torch.where(legal_masks, outputs, -float('inf'))
+    # Sanitize outputs (replace nan/inf) using dtype-aware finite bounds to avoid overflow on float16
+    finfo = torch.finfo(outputs.dtype)
+    posinf = float(finfo.max) / 2.0
+    neginf = float(finfo.min) / 2.0
+    outputs = torch.nan_to_num(outputs, nan=0.0, posinf=posinf, neginf=neginf)
 
-    # Softmax con temperatura
-    # Aplica Softmax con la temperatura para introducir aleatoriedad/exploración.
+    # Use a large negative finite value instead of -inf to avoid producing NaNs in softmax
+    NEG_INF = neginf
+    device = outputs.device
+    masked_logits = torch.where(legal_masks.to(device), outputs, torch.full_like(outputs, NEG_INF))
+
+    # Softmax with temperature. If a row has no legal moves (all False), we'll handle it below.
     probs = torch.softmax(masked_logits / temperature, dim=1)  # [B, 4096]
 
-    # Samplear movimiento
-    # Usa el muestreo multinomial para elegir un movimiento basado en las probabilidades.
-    move_indices = torch.multinomial(probs, num_samples=1).squeeze(1)  # [B]
+    # Fix invalid rows: multinomial requires non-negative finite probabilities that sum > 0.
+    probs = torch.clamp(probs, min=0.0)
+    row_sums = probs.sum(dim=1)
 
-    # Convertir a UCI
-    pred_moves = [number_to_uci(idx.item()) for idx in move_indices]
+    pred_moves = []
+    for i in range(B):
+        if not torch.isfinite(row_sums[i]) or row_sums[i] <= 0.0:
+            # Fallback strategies in order:
+            # 1) try to sample from outputs (ignoring mask) if they are finite
+            out_row = outputs[i]
+            # sanitize
+            # Sanitize using dtype-aware bounds
+            out_finfo = torch.finfo(out_row.dtype)
+            out_posinf = float(out_finfo.max) / 2.0
+            out_neginf = float(out_finfo.min) / 2.0
+            out_row = torch.nan_to_num(out_row, nan=0.0, posinf=out_posinf, neginf=out_neginf)
+            # If legal mask exists for this board, pick a random legal index
+            if legal_masks[i].any():
+                legal_idxs = torch.nonzero(legal_masks[i], as_tuple=True)[0]
+                if legal_idxs.numel() > 0:
+                    idx = int(legal_idxs[random.randrange(0, legal_idxs.numel())].item())
+                    pred_moves.append(number_to_uci(idx))
+                    continue
+
+            # If all -INF-like, pick a random index
+            if torch.all(out_row <= NEG_INF / 2):
+                idx = random.randrange(0, out_row.numel())
+            else:
+                # take argmax of outputs as a deterministic fallback
+                idx = int(torch.argmax(out_row).item())
+            pred_moves.append(number_to_uci(idx))
+        else:
+            row_probs = probs[i]
+            # normalize to sum 1 in case of rounding
+            row_probs = row_probs / row_probs.sum()
+            # multinomial expects 2D tensor
+            try:
+                sel = torch.multinomial(row_probs, num_samples=1).squeeze(0)
+                idx = int(sel.item())
+            except Exception:
+                # As a last resort, pick argmax
+                idx = int(torch.argmax(row_probs).item())
+            pred_moves.append(number_to_uci(idx))
 
     return pred_moves
 
@@ -68,9 +121,25 @@ def batch_predict_worker(input_queue, output_queue, model, device):
             break # Señal de terminación
 
         boards, ids = item  # boards = [tensor], ids = [task_id]
-        boards_tensor = torch.stack(boards).to(device) # Apila los tableros y los mueve a la GPU para el procesamiento vectorizado.
+        # Stack on CPU; if CUDA available, use pinned memory and non_blocking transfer
+        boards_tensor = torch.stack(boards)
+        if isinstance(device, str) and device.startswith("cuda") and boards_tensor.device.type == 'cpu':
+            try:
+                boards_tensor = boards_tensor.pin_memory()
+            except Exception:
+                pass
+            # Move to device using non_blocking to overlap copies
+            to_kwargs = {'non_blocking': True}
+            boards_tensor = boards_tensor.to(device, **to_kwargs)
+        else:
+            boards_tensor = boards_tensor.to(device)
 
-        preds = predict_chess_moves_vectorized(boards_tensor,1.2,model)  # lista de jugadas
+        # Use mixed precision on CUDA for faster inference
+        if isinstance(device, str) and device.startswith("cuda"):
+            with torch.cuda.amp.autocast():
+                preds = predict_chess_moves_vectorized(boards_tensor, 1.2, model)  # lista de jugadas
+        else:
+            preds = predict_chess_moves_vectorized(boards_tensor, 1.2, model)  # lista de jugadas
         results = list(zip(ids, preds))  # [(task_id, pred), ...]  # Empareja el ID de tarea con la predicción.
         #print(results)
         output_queue.put(results) # Envía el resultado a la cola principal (host)
@@ -99,7 +168,7 @@ class ChessBatcher:
     Soporta múltiples clientes concurrentes y mantiene la correspondencia
     entre petición y predicción.
     """
-    def __init__(self, batch_size, model, device, manager):
+    def __init__(self, batch_size, model, device, manager, flusher_interval=0.1):
         self.batch_size = batch_size
         self.device = device
         self.input_queue = Queue() # Cola para enviar datos al worker (CPU -> GPU Worker)
@@ -109,13 +178,31 @@ class ChessBatcher:
                               args=(self.input_queue, self.output_queue, model, device))
         self.worker.start()
         self.current_batch = []
-        
-       
+        # Lock to protect current_batch between flusher thread and add_board
+        self._flush_lock = threading.Lock()
+        # Counters to measure flush behavior
+        self.flush_by_size_count = 0
+        self.flush_by_timer_count = 0
+        # Counters for batch statistics
+        self.total_requests = 0
+        self.total_batches = 0
+        self.total_batch_size = 0
+    # Track max batch size and distribution (small histogram)
+        self.max_batch_size = 0
+        self.batch_size_counts = {}
+    # Event to stop the flusher cleanly
+        self._stop_event = threading.Event()
+        # Start background flusher thread to collect small requests into batches
+        # Allow the flusher interval to be tuned (defaults to 0.1s)
+        self._flusher_interval = flusher_interval
+        self._flusher_thread = threading.Thread(target=self._flusher_loop, daemon=True)
+        self._flusher_thread.start()
+
         self.manager = manager
-        # Diccionario compartido: Almacena las colas de respuesta individuales por ID de tarea.
+            # Diccionario compartido: Almacena las colas de respuesta individuales por ID de tarea.
         self.pending = self.manager.dict()  # task_id -> Queue de respuesta
-        
-        # Proceso Dispatch: Mueve los resultados de la output_queue a la cola individual del cliente.
+            
+            # Proceso Dispatch: Mueve los resultados de la output_queue a la cola individual del cliente.
         self.dispatch_loop_process = Process(target=dispatch_loop, args=(self.output_queue,self.pending), daemon=True)
         self.dispatch_loop_process.start()
 
@@ -126,21 +213,65 @@ class ChessBatcher:
             response_q = self.manager.Queue()
         task_id = uuid.uuid4().hex # Genera un ID único para rastrear la petición.
         self.pending[task_id] = response_q # Asocia el ID a la cola de respuesta.
-        self.current_batch.append((board_tensor, task_id)) # Acumula la petición.
-        # Verifica si se ha alcanzado el tamaño del batch.
-        if len(self.current_batch) >= self.batch_size:
-            self._flush_batch() # Si es así, envía el lote a la GPU.
+        # Append under lock; don't call _flush_batch while holding the lock (avoid reentrant lock)
+        should_flush = False
+        with self._flush_lock:
+            self.current_batch.append((board_tensor, task_id)) # Acumula la petición.
+            self.total_requests += 1
+            # Verifica si se ha alcanzado el tamaño del batch.
+            if len(self.current_batch) >= self.batch_size:
+                should_flush = True
+        if should_flush:
+            self._flush_batch(caller='size') # Si es así, envía el lote a la GPU.
         return response_q # Devuelve la cola donde el cliente esperará la respuesta
 
-    def _flush_batch(self):
+    def _flush_batch(self, caller=None):
         """
         Envía el batch acumulado al worker y limpia la lista.
         """
-        if self.current_batch:
-            #print(self.current_batch)
-            boards, ids = zip(*self.current_batch)
-            self.input_queue.put((boards, ids))
-            self.current_batch = []
+        # Caller should hold _flush_lock when appropriate; double-check here
+        with self._flush_lock:
+            if self.current_batch:
+                boards, ids = zip(*self.current_batch)
+                self.input_queue.put((boards, ids))
+                batch_len = len(ids)
+                self.current_batch = []
+                # Track flush origin
+                if caller == 'size':
+                    self.flush_by_size_count += 1
+                elif caller == 'timer':
+                    self.flush_by_timer_count += 1
+                # Batch stats
+                self.total_batches += 1
+                self.total_batch_size += batch_len
+                # Max and histogram
+                if batch_len > self.max_batch_size:
+                    self.max_batch_size = batch_len
+                self.batch_size_counts[batch_len] = self.batch_size_counts.get(batch_len, 0) + 1
+
+    def _flusher_loop(self):
+        """Background thread that flushes small batches at a fixed interval to improve batching.
+        """
+        while not self._stop_event.is_set():
+            time.sleep(self._flusher_interval)
+            # Flush if any pending requests. Call _flush_batch() which will acquire the lock itself
+            # Avoid holding the lock here to prevent deadlocks (we used to acquire the lock then call
+            # _flush_batch which also tried to acquire the same lock).
+            if self.current_batch:
+                self._flush_batch(caller='timer')
+
+    def get_flush_stats(self):
+        """Return a tuple (size_flushes, timer_flushes)."""
+        return (self.flush_by_size_count, self.flush_by_timer_count)
+
+    def get_batch_stats(self):
+        """Return (total_requests, total_batches, avg_batch_size).
+        avg_batch_size is None when no batches have been sent yet.
+        """
+        avg = None
+        if self.total_batches > 0:
+            avg = float(self.total_batch_size) / float(self.total_batches)
+        return (self.total_requests, self.total_batches, avg, self.max_batch_size, dict(self.batch_size_counts))
 
 
     def poll_predictions(self):
@@ -166,82 +297,15 @@ class ChessBatcher:
         self._flush_batch()   # Asegura que las peticiones pendientes sean procesadas
         self.input_queue.put(None)  # Señal de cierre
         self.worker.join()  # Espera a que el worker finalice su ejecución
+        # Stop flusher thread
+        try:
+            self._stop_event.set()
+            if self._flusher_thread.is_alive():
+                self._flusher_thread.join(timeout=1.0)
+        except Exception:
+            pass
         self.dispatch_loop_process.terminate()
 
-
-"""
-def chessmarro_mcts_predict_chess_move(fen, simulations, model, device):
-
-    best_move = 12345
-
-
-
-
-####################################3
-
-    fens = [
-        "r3k1nr/ppp2ppp/2np1q2/2b5/2Q1PB2/7P/PPP2P1P/RN2KB1R b KQkq - 0 8",
-        "r1bqkbnr/pppppppp/n7/8/8/5N2/PPPPPPPP/RNBQKB1R b KQkq - 1 2",
-        '5k2/R7/3K4/4p3/5P2/8/8/5r2 w - - 0 0',
-    '5k2/1R6/4p1p1/1pr3Pp/7P/1K6/8/8 w - - 0 0',
-    '5k2/8/p7/4K1P1/P4R2/6r1/8/8 b - - 0 0',
-    '8/8/8/p2r1k2/7p/PP1RK3/6P1/8 b - - 0 0',
-    '8/8/8/1P4p1/5k2/5p2/P6K/8 b - - 0 0',
-    '3b2k1/1p3p2/p1p5/2P4p/1P2P1p1/5p2/5P2/4RK2 w - - 0 0',
-    '5k2/3R4/2K1p1p1/4P1P1/5P2/8/3r4/8 b - - 0 0',
-    '6k1/6pp/5p2/8/5P2/P7/2K4P/8 b - - 0 0',
-    '8/3R4/8/r3N2p/P1Pp1P2/2k2K1P/3r4/8 w - - 0 0',
-    '6k1/8/6r1/8/5b2/2PR4/4K3/8 w - - 0 0',
-    '8/1p3k2/3B4/8/3b2P1/1P6/6K1/8 b - - 0 0',
-    '8/8/8/2p1k3/P6R/1K6/6rP/8 w - - 0 0',
-    '6k1/5p1p/6p1/1P1n4/1K4P1/N6P/8/8 w - - 0 0',
-    '8/k5r1/2N5/PK6/2B5/8/8/8 b - - 0 0',
-    '6k1/8/5K2/8/5P1R/r6P/8/8 b - - 0 0',
-    '8/8/4k1KP/p5P1/r7/8/8/8 w - - 0 0',
-    '1R6/p2r4/2ppkp2/6p1/2PKP2p/P4P2/6PP/8 b - - 0 0',
-    '8/7p/6p1/8/k7/8/2K3P1/8 b - - 0 0',
-    'R7/8/8/6p1/4k3/3rPp1P/8/6K1 b - - 0 0',
-    '8/7p/1p1k2p1/p1p2p2/8/PP2P2P/4KPP1/8 w - - 0 0' 
-    ]
-
-    # Preprocesar todas las posiciones
-    boards = [concat_fen_legal(fen).cpu() for fen in fens]  # cada uno es numpy
-    manager = Manager()
-    batcher = ChessBatcher(8, model, 'cuda:0', manager=manager)
-
-
-
-    res_queues = []
-
-    for board_tensor in boards:
-        # Creamos una cola compartida por manager para cada petición
-        response_q = manager.Queue()
-        
-        # Añadimos el board al batcher pasando la cola de respuesta
-        batcher.add_board(board_tensor, response_q=response_q)
-        
-        # Guardamos la cola para que el cliente pueda esperar su predicción
-        res_queues.append(response_q)
-
-    # Enviar el batch final que quede
-    batcher._flush_batch()
-
-    # Recuperar resultados de cada cola
-    for i, q in enumerate(res_queues):
-      #  print(f"Esperando predicción en cola {i}:", q)
-        move = q.get()  # se desbloquea automáticamente cuando el worker termine
-       # print(f"Recibido {i}:", move)
-
-
-    # Cerrar worker
-    batcher.close()
-   
-
-#######################################
-
-    return best_move
-
-"""
 
 class MCTSNode:
     def __init__(self, state, parent=None, move=None):
@@ -251,18 +315,23 @@ class MCTSNode:
         self.children = []  # Child nodes (future possible states)
         self.visits = 0  # Number of times this node has been visited
         self.value = 0  # Total reward (win/loss/draw) from simulations
+        # Virtual loss for parallel MCTS and per-node lock
+        self.virtual_loss = 0
+        self.lock = threading.Lock()
 
     def is_fully_expanded(self):
         # Returns True if all possible moves have been explored
         return len(self.children) == sum(1 for _ in self.state.legal_moves)
 
 
-    def best_child(self, exploration_weight=1.4):
+    def best_child(self, exploration_weight=1.4, virtual_loss_coef=0.0):
         # Select the child with the best value using UCT (Upper Confidence Bound for Trees)
         best_value = -float('inf')
         best_node = None
         for child in self.children:
-            uct_value = child.value / (child.visits + 1) + exploration_weight * math.sqrt(math.log(self.visits + 1) / (child.visits + 1))
+            # Use virtual_loss to penalize children currently under exploration by other threads
+            # Lower virtual_loss makes a child more attractive; subtract virtual_loss_coef * virtual_loss
+            uct_value = (child.value / (child.visits + 1)) + exploration_weight * math.sqrt(math.log(self.visits + 1) / (child.visits + 1)) - virtual_loss_coef * child.virtual_loss
             if uct_value > best_value:
                 best_value = uct_value
                 best_node = child
@@ -285,68 +354,119 @@ class MCTSNode:
 
 # Define the MCTS algorithm
 class MCTS:
-    def __init__(self, root, chess_batcher, simulations=100, num_workers=4):
+    def __init__(self, root, get_best_function, chess_batcher=None, simulations=100, num_workers=None, virtual_loss_coef=1.0, virtual_loss_amount=1):
+        """
+        root: MCTSNode root
+        get_best_function: callable(state) -> uci_move string
+        chess_batcher: optional ChessBatcher instance used by get_best_function
+        simulations: number of MCTS iterations
+        """
         self.root = root  # Root node
-        self.get_best_function = get_best_function  # Function to get the best move
+        self.get_best_function = get_best_function  # Function to get the best move (callable)
         self.simulations = simulations  # Number of MCTS simulations
-        # instancia de ChessBatcher para la inferencia vectorizada.
+        # instancia de ChessBatcher para la inferencia vectorizada (opcional).
         self.chess_batcher = chess_batcher
-        self.num_workers = num_workers # Número de hilos/procesos para MCTS
+        # If num_workers is not provided, set a higher default to increase concurrency
+        if num_workers is None:
+            try:
+                cpu_count = mp.cpu_count()
+            except Exception:
+                cpu_count = 4
+            # default to 2x CPUs but cap to a reasonable upper bound
+            self.num_workers = min(64, max(4, cpu_count * 2))
+        else:
+            self.num_workers = num_workers
+        # Virtual loss tuning
+        self.virtual_loss_coef = virtual_loss_coef
+        self.virtual_loss_amount = virtual_loss_amount
 
     def search(self):
         # Usamos ThreadPoolExecutor porque la mayor parte del tiempo de MCTS 
         # (selección, expansión, backpropagation) es I/O-bound (esperando el Batcher) o CPU-bound ligero.
-        for _ in range(self.simulations):
-            print(_)
-            # Step 1: Selection
-            node = self._select(self.root)
-
-            # Step 2: Expansion
+        # Run simulations in parallel to create concurrent model requests for batching.
+        def worker_sim(_i):
+            # Selection (with virtual loss) and expansion with minimal locking
+            node = self._select()
             if not node.is_fully_expanded():
                 node = self._expand(node)
-
-            # Step 3: Simulation (Playout)
+            # Simulation (may block on get_best and allow batching)
             winner = self._simulate(node)
-
-            # Step 4: Backpropagation
+            # Backpropagate (will decrement virtual loss)
             self._backpropagate(node, winner)
 
-        # Return the best move after simulations
-        print("Children:", len(self.root.children[0].children))
-        print(self.root.to_json())
-        return self.root.best_child(exploration_weight=0).move
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.num_workers) as exe:
+            # Submit all simulations; executor will schedule workers and allow many concurrent get_best calls
+            futures = [exe.submit(worker_sim, i) for i in range(self.simulations)]
+            # Wait for all to complete
+            for f in concurrent.futures.as_completed(futures):
+                try:
+                    f.result()
+                except Exception:
+                    pass
 
-    def _select(self, node):
-        # Traverse down the tree to find a leaf node
-        while node.is_fully_expanded():
-            node = node.best_child()  # Use the best child with UCT
-        return node
+        # Return the best move after simulations
+        # Safe debug prints
+        print("Root children:", len(self.root.children))
+        try:
+            print(self.root.to_json())
+        except Exception:
+            pass
+
+        best = self.root.best_child(exploration_weight=0)
+        return best.move if best is not None else None
+
+    def _select(self):
+        # Traverse down the tree to find a leaf node starting from root.
+        # We implement selection with virtual loss: when we descend to a child we increment its virtual_loss
+        # so other threads tend to avoid the same child.
+        cur = self.root
+        while cur.is_fully_expanded():
+            # choose best child considering virtual loss
+            child = cur.best_child(exploration_weight=1.4, virtual_loss_coef=self.virtual_loss_coef)
+            if child is None:
+                break
+            # increment virtual loss for chosen child under its lock
+            with child.lock:
+                child.virtual_loss += self.virtual_loss_amount
+            cur = child
+        return cur
 
     def _expand(self, node):
         # Expand one of the children (possible moves from the current position)
-        legal_moves = node.state.legal_moves
-        for move in legal_moves:
-            new_state = node.state.copy()  # Clone the board to simulate the move
-            new_state.push(move)  # Apply the move
-
-            # Check if this state is already explored
-            if not any(child.move == move for child in node.children):
-                new_node = MCTSNode(new_state, parent=node, move=move)
-                node.children.append(new_node)
-                return new_node
+        # Expand one move atomically to avoid races when multiple threads expand the same node
+        legal_moves = list(node.state.legal_moves)
+        with node.lock:
+            for move in legal_moves:
+                # Check if this state is already explored
+                if not any(child.move == move for child in node.children):
+                    new_state = node.state.copy()  # Clone the board to simulate the move
+                    new_state.push(move)  # Apply the move
+                    new_node = MCTSNode(new_state, parent=node, move=move)
+                    node.children.append(new_node)
+                    return new_node
 
         return node  # Return the node if no expansion was done
 
     def _simulate(self, node):
         # Perform a random playout using get_best to simulate moves
         state = node.state.copy()
-        while not state.is_checkmate() and not state.is_game_over()  and sum(1 for _ in state.legal_moves) > 0:
-            best_move = self.get_best_function(state)  # Use the CNN to predict the best move
-          #  print(best_move, chess.Move.from_uci(best_move), state.legal_moves)
-            if chess.Move.from_uci(best_move) not in state.legal_moves:
-             #   print("Best move is illegal, choosing a random legal move.")
-                best_move = random.choice(list(state.legal_moves)).uci()
-            state.push_uci(best_move)
+        while not state.is_checkmate() and not state.is_game_over() and sum(1 for _ in state.legal_moves) > 0:
+            # Ask the supplied predictor for a move (string expected)
+            best_move_str = self.get_best_function(state)
+
+            # Validate and convert into a chess.Move object; fall back to a random legal move on any error
+            try:
+                if not isinstance(best_move_str, str):
+                    raise ValueError("predicted move is not a UCI string")
+                uci_move = chess.Move.from_uci(best_move_str)
+                if uci_move not in state.legal_moves:
+                    raise ValueError("predicted move not legal in this state")
+            except Exception:
+                # Choose a random legal move as fallback
+                uci_move = random.choice(list(state.legal_moves))
+
+            # Apply the Move object
+            state.push(uci_move)
         return state.result()  # Return the result: '1-0' for white win, '0-1' for black win, '1/2-1/2' for draw
 
     def _backpropagate(self, node, winner):
@@ -359,6 +479,13 @@ class MCTS:
                 node.value -= 1
             else:  # Draw
                 node.value += 0.5
+            # Decrement virtual loss if this node was previously incremented by selection
+            try:
+                with node.lock:
+                    if hasattr(self, 'virtual_loss_amount') and node.virtual_loss > 0:
+                        node.virtual_loss = max(0, node.virtual_loss - self.virtual_loss_amount)
+            except Exception:
+                pass
             node = node.parent
 
 
@@ -370,19 +497,68 @@ def get_best_move(board):
 
 
 
-def chessmarro_mcts_predict_chess_move(fen, simulations, model, device):
-# Set up the initial chess board state
+def chessmarro_mcts_predict_chess_move(fen, simulations, model, device, batch_size=64, flusher_interval=0.1, num_workers=None, virtual_loss_coef=1.0, virtual_loss_amount=1):
+    # Set up the initial chess board state
     board = chess.Board(fen)
 
     # Create the root node
     root = MCTSNode(state=board)
 
-    # Initialize MCTS with n simulations
-    mcts = MCTS(root=root, get_best_function=get_best_move, simulations=simulations)
+    # Create a manager and a ChessBatcher to perform vectorized predictions
+    manager = Manager()
+    # Use provided batch_size (can be tuned)
+    batcher = ChessBatcher(batch_size, model, device, manager=manager, flusher_interval=flusher_interval)
+
+    # Define a get_best function that enqueues the state and waits for the batched prediction
+    def get_best(state):
+        # Convert state to fen and board tensor
+        fen_local = state.fen()
+        board_tensor = concat_fen_legal(fen_local)
+        # Ensure it's a torch tensor of floats on CPU for batching; worker will move to device
+        if not isinstance(board_tensor, torch.Tensor):
+            board_tensor = torch.tensor(board_tensor, dtype=torch.float32)
+        board_tensor = board_tensor.to(torch.float32)
+
+        # Create a response queue and submit to batcher
+        response_q = manager.Queue()
+        batcher.add_board(board_tensor, response_q=response_q)
+        # Do NOT force a flush here; background flusher will coalesce requests into batches.
+
+        # Wait for the prediction (blocking)
+        try:
+            pred = response_q.get()
+        except Exception:
+            # On failure, fall back to direct prediction
+            pred = predict_chess_move(fen_local, model, device)
+        return pred
+
+    # Initialize MCTS with the wrapped get_best function
+    mcts = MCTS(root=root, get_best_function=get_best, chess_batcher=batcher, simulations=simulations, num_workers=num_workers, virtual_loss_coef=virtual_loss_coef, virtual_loss_amount=virtual_loss_amount)
 
     # Run the MCTS algorithm and get the best move
-    best_move_node = mcts.search()
-    best_move = best_move_node
+    best_move = mcts.search()
+
+    # Optionally report flush stats before closing
+    try:
+        size_flushes, timer_flushes = batcher.get_flush_stats()
+        print(f"Batcher flushes — by size: {size_flushes}, by timer: {timer_flushes}")
+    except Exception:
+        pass
+
+    try:
+        total_requests, total_batches, avg_batch, max_batch, batch_hist = batcher.get_batch_stats()
+        print(f"Batch stats — requests: {total_requests}, batches: {total_batches}, avg batch size: {avg_batch}, max batch: {max_batch}")
+        # Print small histogram (only sizes with at least one occurrence)
+        if batch_hist:
+            print("Batch size distribution (size:count):", sorted(batch_hist.items()))
+    except Exception:
+        pass
+
+    # Close batcher/worker processes
+    try:
+        batcher.close()
+    except Exception:
+        pass
 
     # Display the best move
     print(f"The best move predicted is: {best_move}")
