@@ -168,7 +168,7 @@ class ChessBatcher:
     Soporta múltiples clientes concurrentes y mantiene la correspondencia
     entre petición y predicción.
     """
-    def __init__(self, batch_size, model, device, manager, flusher_interval=0.1):
+    def __init__(self, batch_size, model, device, manager, flusher_interval=0.2):
         self.batch_size = batch_size
         self.device = device
         self.input_queue = Queue() # Cola para enviar datos al worker (CPU -> GPU Worker)
@@ -386,21 +386,26 @@ class MCTS:
         # Run simulations in parallel to create concurrent model requests for batching.
         def worker_sim(_i):
             # Selection (with virtual loss) and expansion with minimal locking
+            print("worker_sim",_i)
             node = self._select()
             if not node.is_fully_expanded():
                 node = self._expand(node)
             # Simulation (may block on get_best and allow batching)
-            winner = self._simulate(node)
+            winner, depth = self._simulate(node)
             # Backpropagate (will decrement virtual loss)
             self._backpropagate(node, winner)
+            return depth
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.num_workers) as exe:
             # Submit all simulations; executor will schedule workers and allow many concurrent get_best calls
             futures = [exe.submit(worker_sim, i) for i in range(self.simulations)]
-            # Wait for all to complete
+            # Collect depths for telemetry
+            depths = []
             for f in concurrent.futures.as_completed(futures):
                 try:
-                    f.result()
+                    d = f.result()
+                    if isinstance(d, int) or isinstance(d, float):
+                        depths.append(d)
                 except Exception:
                     pass
 
@@ -413,6 +418,14 @@ class MCTS:
             pass
 
         best = self.root.best_child(exploration_weight=0)
+        # Print average depth telemetry if we collected any
+        try:
+            if 'depths' in locals() and depths:
+                avg_depth = float(sum(depths)) / float(len(depths))
+                print(f"MCTS simulation average depth: {avg_depth} (n={len(depths)})")
+        except Exception:
+            pass
+
         return best.move if best is not None else None
 
     def _select(self):
@@ -450,6 +463,7 @@ class MCTS:
     def _simulate(self, node):
         # Perform a random playout using get_best to simulate moves
         state = node.state.copy()
+        depth = 0
         while not state.is_checkmate() and not state.is_game_over() and sum(1 for _ in state.legal_moves) > 0:
             # Ask the supplied predictor for a move (string expected)
             best_move_str = self.get_best_function(state)
@@ -467,7 +481,10 @@ class MCTS:
 
             # Apply the Move object
             state.push(uci_move)
-        return state.result()  # Return the result: '1-0' for white win, '0-1' for black win, '1/2-1/2' for draw
+            depth += 1
+
+        # Return the result and the depth of the playout
+        return state.result(), depth  # Return the result and the playout depth
 
     def _backpropagate(self, node, winner):
         # Backpropagate the result of the simulation up the tree
@@ -497,7 +514,7 @@ def get_best_move(board):
 
 
 
-def chessmarro_mcts_predict_chess_move(fen, simulations, model, device, batch_size=64, flusher_interval=0.1, num_workers=None, virtual_loss_coef=1.0, virtual_loss_amount=1):
+def chessmarro_mcts_predict_chess_move(fen, simulations, model, device, batch_size=32, flusher_interval=0.1, num_workers=20, virtual_loss_coef=1.0, virtual_loss_amount=1):
     # Set up the initial chess board state
     board = chess.Board(fen)
 
