@@ -41,5 +41,6 @@ if __name__ == "__main__":
     # - model: El modelo de red neuronal cargado.
     # - device: El dispositivo ('cuda') donde se ejecuta el cómputo.
 
-    move = chessmarro_mcts_predict_chess_move(fen, simulations,model,device, num_workers=64)
+    move, json = chessmarro_mcts_predict_chess_move(fen, simulations,model,device, num_workers=64)
     print(f"Mejor movimiento según MCTS ({simulations} simulaciones): {move}")
+    #print(f"Árbol MCTS en formato JSON: {json}")

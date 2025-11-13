@@ -318,6 +318,8 @@ class MCTSNode:
         # Virtual loss for parallel MCTS and per-node lock
         self.virtual_loss = 0
         self.lock = threading.Lock()
+        # Which player made the move that led to this node (True=White, False=Black), None for root
+        self.player_just_moved = None
 
     def is_fully_expanded(self):
         # Returns True if all possible moves have been explored
@@ -411,11 +413,11 @@ class MCTS:
 
         # Return the best move after simulations
         # Safe debug prints
-        print("Root children:", len(self.root.children))
-        try:
-            print(self.root.to_json())
-        except Exception:
-            pass
+       # print("Root children:", len(self.root.children))
+       # try:
+       #     print(self.root.to_json())
+       # except Exception:
+       #     pass
 
         best = self.root.best_child(exploration_weight=0)
         # Print average depth telemetry if we collected any
@@ -426,7 +428,7 @@ class MCTS:
         except Exception:
             pass
 
-        return best.move if best is not None else None
+        return best.move if best is not None else None, self.root.to_json()
 
     def _select(self):
         # Traverse down the tree to find a leaf node starting from root.
@@ -455,18 +457,68 @@ class MCTS:
                     new_state = node.state.copy()  # Clone the board to simulate the move
                     new_state.push(move)  # Apply the move
                     new_node = MCTSNode(new_state, parent=node, move=move)
+                    # The player who just moved to reach new_state is the player who was to move at the parent
+                    try:
+                        new_node.player_just_moved = node.state.turn
+                    except Exception:
+                        new_node.player_just_moved = None
                     node.children.append(new_node)
                     return new_node
 
         return node  # Return the node if no expansion was done
 
+    def _simple_eval(self, board):
+        """Lightweight material-count evaluation: positive => White advantage."""
+        piece_values = {chess.PAWN: 1, chess.KNIGHT: 3, chess.BISHOP: 3,
+                        chess.ROOK: 5, chess.QUEEN: 9}
+        score = 0
+        for piece_type, val in piece_values.items():
+            score += len(board.pieces(piece_type, chess.WHITE)) * val
+            score -= len(board.pieces(piece_type, chess.BLACK)) * val
+        return score
+
     def _simulate(self, node):
-        # Perform a random playout using get_best to simulate moves
+        """
+        Perform a playout using get_best to simulate moves.
+        Returns a tuple (winner_str, depth) where winner_str is one of '1-0','0-1','1/2-1/2'.
+        If the playout exceeds the depth cap (60), evaluate the position with _simple_eval
+        and return a winner based on material advantage.
+        """
+        DEPTH_CAP = 60
         state = node.state.copy()
         depth = 0
         while not state.is_checkmate() and not state.is_game_over() and sum(1 for _ in state.legal_moves) > 0:
             # Ask the supplied predictor for a move (string expected)
             best_move_str = self.get_best_function(state)
+
+            # Prevent overly long playouts
+            if (
+                depth >= DEPTH_CAP
+                or state.can_claim_fifty_moves()
+                or state.can_claim_threefold_repetition()
+            ):
+                # --- Evaluate the truncated position ---
+                eval_score = self._simple_eval(state)
+
+                # --- Normalize the material difference to a bounded range (-1, 1) ---
+                # A difference of ±10 (e.g., una dama entera) se considera máxima ventaja.
+                normalized = max(-1.0, min(1.0, eval_score / 10.0))
+
+                # --- Apply a small penalty for deeper (slower) simulations ---
+                # Incentiva mates o ventajas más rápidas
+                decay = 1.0 - min(0.5, depth / DEPTH_CAP * 0.5)
+                normalized *= decay
+
+                # --- Add a small neutral zone to avoid oscillations ---
+                thresh = 0.05
+                if normalized > thresh:
+                    result = '1-0'
+                elif normalized < -thresh:
+                    result = '0-1'
+                else:
+                    result = '1/2-1/2'
+
+                return result, depth
 
             # Validate and convert into a chess.Move object; fall back to a random legal move on any error
             try:
@@ -483,26 +535,34 @@ class MCTS:
             state.push(uci_move)
             depth += 1
 
-        # Return the result and the depth of the playout
-        return state.result(), depth  # Return the result and the playout depth
+        # If game finished normally, return its result and depth
+        # state.result() returns strings like '1-0','0-1','1/2-1/2'
+        return state.result(), depth
 
     def _backpropagate(self, node, winner):
-        # Backpropagate the result of the simulation up the tree
+        """Propaga el resultado hacia arriba, ajustando el signo según quién mueve."""
         while node is not None:
             node.visits += 1
-            if winner == '1-0':  # White wins
-                node.value += 1
-            elif winner == '0-1':  # Black wins
-                node.value -= 1
-            else:  # Draw
-                node.value += 0.5
-            # Decrement virtual loss if this node was previously incremented by selection
-            try:
-                with node.lock:
-                    if hasattr(self, 'virtual_loss_amount') and node.virtual_loss > 0:
-                        node.virtual_loss = max(0, node.virtual_loss - self.virtual_loss_amount)
-            except Exception:
-                pass
+
+            # Resultado desde la perspectiva de blancas
+            if winner == '1-0':
+                result = 1.0
+            elif winner == '0-1':
+                result = -1.0
+            else:
+                result = 0.5
+
+            # Si el nodo representa el turno de negras, invertir el signo
+            if not node.state.turn:  # False = negras
+                result = -result
+
+            node.value += result
+
+            # Decrementar virtual loss si procede
+            with node.lock:
+                if hasattr(self, 'virtual_loss_amount') and node.virtual_loss > 0:
+                    node.virtual_loss = max(0, node.virtual_loss - self.virtual_loss_amount)
+
             node = node.parent
 
 
@@ -553,7 +613,7 @@ def chessmarro_mcts_predict_chess_move(fen, simulations, model, device, batch_si
     mcts = MCTS(root=root, get_best_function=get_best, chess_batcher=batcher, simulations=simulations, num_workers=num_workers, virtual_loss_coef=virtual_loss_coef, virtual_loss_amount=virtual_loss_amount)
 
     # Run the MCTS algorithm and get the best move
-    best_move = mcts.search()
+    best_move, json = mcts.search()
 
     # Optionally report flush stats before closing
     try:
@@ -579,4 +639,4 @@ def chessmarro_mcts_predict_chess_move(fen, simulations, model, device, batch_si
 
     # Display the best move
     print(f"The best move predicted is: {best_move}")
-    return best_move
+    return best_move, json
