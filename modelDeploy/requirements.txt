@@ -1,4 +1,4 @@
 # torch
 transformers
 gradio
-chess  # (optional, for FEN parsing)
+chess 
