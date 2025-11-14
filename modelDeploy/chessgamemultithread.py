@@ -30,79 +30,45 @@ if torch.cuda.is_available():
 # Función central que realiza la inferencia en la GPU. 
 # Procesa múltiples tableros a la vez (batching) para maximizar la eficiencia de la Conv2D.
 def predict_chess_moves_vectorized(boards_tensor, temperature, model):
-    """
-    Predice movimientos para un batch de posiciones con Conv2D, usando
-    movimientos legales codificados en los últimos 64 canales/elementos.
-    """
     B = boards_tensor.size(0)
     device = boards_tensor.device
 
-    with torch.no_grad(): # Ejecución del modelo. Conv2D espera [Batch, Canales, Alto, Ancho].
-        outputs = model(boards_tensor)  # [B, 4096], conv2d espera [B, C, H, W]
+    with torch.no_grad():
+        logits = model(boards_tensor)  # [B,4096]
 
-    # Extraer máscaras legales de los últimos 64 canales
-    # Flatten del canal y el tablero a 4096
-    legal_masks = boards_tensor[:, -64:, :, :].reshape(B, 4096).to(dtype=torch.bool)
+    # --- LEGAL MASK ---
+    legal_masks = boards_tensor[:, -64:, :, :].reshape(B, 4096).bool()
 
-    # Sanitize outputs (replace nan/inf) using dtype-aware finite bounds to avoid overflow on float16
-    finfo = torch.finfo(outputs.dtype)
-    posinf = float(finfo.max) / 2.0
-    neginf = float(finfo.min) / 2.0
-    outputs = torch.nan_to_num(outputs, nan=0.0, posinf=posinf, neginf=neginf)
+    # --- SANITIZE LOGITS  ---
+    finfo = torch.finfo(logits.dtype)
+    negbig = finfo.min / 4   # valor negativo grande estable
+    logits = torch.nan_to_num(logits, nan=0.0,
+                              posinf=finfo.max/4,
+                              neginf=finfo.min/4)
 
-    # Use a large negative finite value instead of -inf to avoid producing NaNs in softmax
-    NEG_INF = neginf
-    device = outputs.device
-    masked_logits = torch.where(legal_masks.to(device), outputs, torch.full_like(outputs, NEG_INF))
+    # --- MASK: movimientos ilegales a un valor muy bajo ---
+    masked = logits.masked_fill(~legal_masks, negbig)
 
-    # Softmax with temperature. If a row has no legal moves (all False), we'll handle it below.
-    probs = torch.softmax(masked_logits / temperature, dim=1)  # [B, 4096]
+    # --- SOFTMAX ---
+    probs = torch.softmax(masked / temperature, dim=1)
 
-    # Fix invalid rows: multinomial requires non-negative finite probabilities that sum > 0.
+    # --- FILAS CON SUMA 0 / INVALIDAS ---
     probs = torch.clamp(probs, min=0.0)
-    row_sums = probs.sum(dim=1)
+    row_sums = probs.sum(dim=1, keepdim=True)
+    valid = (row_sums > 0) & torch.isfinite(row_sums)
 
-    pred_moves = []
-    for i in range(B):
-        if not torch.isfinite(row_sums[i]) or row_sums[i] <= 0.0:
-            # Fallback strategies in order:
-            # 1) try to sample from outputs (ignoring mask) if they are finite
-            out_row = outputs[i]
-            # sanitize
-            # Sanitize using dtype-aware bounds
-            out_finfo = torch.finfo(out_row.dtype)
-            out_posinf = float(out_finfo.max) / 2.0
-            out_neginf = float(out_finfo.min) / 2.0
-            out_row = torch.nan_to_num(out_row, nan=0.0, posinf=out_posinf, neginf=out_neginf)
-            # If legal mask exists for this board, pick a random legal index
-            if legal_masks[i].any():
-                legal_idxs = torch.nonzero(legal_masks[i], as_tuple=True)[0]
-                if legal_idxs.numel() > 0:
-                    idx = int(legal_idxs[random.randrange(0, legal_idxs.numel())].item())
-                    pred_moves.append(number_to_uci(idx))
-                    continue
+    # Si row inválida → prob = máscara uniformemente repartida
+    uniform = legal_masks.float()
+    uniform = uniform / uniform.sum(dim=1, keepdim=True).clamp(min=1)
 
-            # If all -INF-like, pick a random index
-            if torch.all(out_row <= NEG_INF / 2):
-                idx = random.randrange(0, out_row.numel())
-            else:
-                # take argmax of outputs as a deterministic fallback
-                idx = int(torch.argmax(out_row).item())
-            pred_moves.append(number_to_uci(idx))
-        else:
-            row_probs = probs[i]
-            # normalize to sum 1 in case of rounding
-            row_probs = row_probs / row_probs.sum()
-            # multinomial expects 2D tensor
-            try:
-                sel = torch.multinomial(row_probs, num_samples=1).squeeze(0)
-                idx = int(sel.item())
-            except Exception:
-                # As a last resort, pick argmax
-                idx = int(torch.argmax(row_probs).item())
-            pred_moves.append(number_to_uci(idx))
+    final_probs = torch.where(valid, probs / row_sums, uniform)
 
-    return pred_moves
+    # --- SAMPLE ---
+    # multinomial requiere 2D
+    idxs = torch.multinomial(final_probs, num_samples=1).squeeze(1)
+
+    # --- Convertir a UCI ---
+    return [number_to_uci(int(i)) for i in idxs]
 
      
 # Proceso secundario (Worker) que se ejecuta continuamente en la GPU. 

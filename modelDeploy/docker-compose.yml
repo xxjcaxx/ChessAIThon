@@ -4,6 +4,7 @@ services:
     container_name: chessaithon-ai
     ports:
       - "7860:7860"
+      - "8000:8000"
     restart: unless-stopped
     environment:
       - PYTHONUNBUFFERED=1
