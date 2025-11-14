@@ -107,20 +107,21 @@ The following Mermaid flowchart describes the same architecture. You can paste i
 ```mermaid
 flowchart LR
   A[Browser / CLI / curl]
-  A -->|HTTP request| B[app.py\n(Gradio 7860 / FastAPI 8000)\nget_model() lazy]
+  A -->|HTTP request| B["app.py<br>(Gradio 7860 / FastAPI 8000)<br>get_model() lazy"]
   B --> C[predict_fn]
   C --> D[chessmarro_mcts_predict_chess_move]
   D --> E[MCTS]
-  E -->|calls| F[get_best(state) -> board_tensor]
-  F --> G[ChessBatcher\n(current_batch, flusher)]
+  E -->|calls| F["get_best(state) -&gt; board_tensor"]
+  F --> G["ChessBatcher<br>(current_batch, flusher)"]
   G -->|flush| H[input_queue]
-  H --> I[batch_predict_worker\n(process)\n(model on device)]
-  I --> J[output_queue\n(task_id, uci_move)]
-  J --> K[dispatch_loop\n(process)]
-  K --> L[response_q (per request)]
+  H --> I["batch_predict_worker<br>(process)<br>(model on device)"]
+  I --> J["output_queue<br>(task_id, uci_move)"]
+  J --> K["dispatch_loop<br>(process)"]
+  K --> L["response_q (per request)"]
   L --> E
-  E --> M[return best_move (UCI)]
-  M --> N[caller receives move]\n
+  E --> M["return best_move (UCI)"]
+  M --> N["caller receives move"]
+
   style B fill:#f9f,stroke:#333,stroke-width:1px
   style I fill:#bff,stroke:#333,stroke-width:1px
 ```
