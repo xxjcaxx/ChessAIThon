@@ -4,13 +4,9 @@ import template from "./board.html?raw"
 import { setFen, getFen } from "chessmarro-board";
 import { BehaviorSubject, Subject, fromEvent, map, filter, tap, merge, switchMap, of, throttleTime, asyncScheduler, concat, take, concatMap, distinctUntilChanged } from 'rxjs';
 import { uciToMove, chessPiecesUnicode, loadLocalStorage } from "../../chessUtils";
-
+import { initStyle, initTemplate } from '../componentsUtils.js';
 
 const renderMoves = (moves) => {
-    const wrapper = document.createElement('div');
-    wrapper.innerHTML = '<div class="tags">' + moves.map((move) => `
-  <span data-move="${move.lan}"class="tag is-light is-clickable"><span class="is-size-4">${move.piece}</span>${move.lan}</span>
-  `).join('') + '</ul>';
 
     const moveDiv = document.createElement('div');
     moveDiv.classList.add('tags');
@@ -62,8 +58,6 @@ class boardComponent extends HTMLElement {
         currentFen: new BehaviorSubject("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"),
         currentBoard: new BehaviorSubject(null),
         currentTurn: new BehaviorSubject(null),
-        //storedScenarios: new BehaviorSubject([]),
-        //loadedScenarios: new BehaviorSubject([]),
         displayFen: new BehaviorSubject("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"),
         movesHistory: new BehaviorSubject([]),
     }
@@ -79,13 +73,10 @@ class boardComponent extends HTMLElement {
         this.state.displayFen.next(initFen);
 
         // Estilos
-        const styleElement = document.createElement("style");
-        styleElement.textContent = style;
-        this.append(styleElement);
-
-
-        this.innerHTML = template;
-
+        this.append(
+            initStyle(style),
+            initTemplate(template)
+        );
 
         const movesList = this.querySelector("#moves-list");
         const historyList = this.querySelector('#movesHistoryList');
@@ -163,26 +154,35 @@ class boardComponent extends HTMLElement {
         const makeMove = (move) => {
             const [x, y, X, Y] = uciToMove(move);
             board.movePiece([x, y], [X, Y], 0.3);
-            // board.refresh();
-            console.log(move);
 
             const chess = new Chess(this.state.currentFen.getValue(), { skipValidation: true });
-            chess.move(move);
-            const fen = chess.fen();
-            this.state.currentFen.next(fen);
-            this.state.currentBoard.next(setFen(fen));
-            this.state.currentTurn.next(chess.turn());
-            this.state.movesHistory.next([...this.state.movesHistory.getValue(), { fen, move }]);
 
-            renderMovesDiv(movesList, fen);
-            const storedBestMoves = loadLocalStorage();
-            storedBestMoves.push({ fen, move });
-            localStorage.setItem('best_moves', JSON.stringify(storedBestMoves));
-            const customEvent = new CustomEvent('makeMove', {
-                bubbles: true,  // para que se propague
-                detail: { message: move.lan }
-            });
-            this.dispatchEvent(customEvent);
+            try {
+                chess.move(move, { sloppy: true });
+                const fen = chess.fen();
+                this.state.currentFen.next(fen);
+                this.state.currentBoard.next(setFen(fen));
+                this.state.currentTurn.next(chess.turn());
+                this.state.movesHistory.next([...this.state.movesHistory.getValue(), { fen, move }]);
+
+                renderMovesDiv(movesList, fen);
+                const storedBestMoves = loadLocalStorage();
+                storedBestMoves.push({ fen, move });
+                localStorage.setItem('best_moves', JSON.stringify(storedBestMoves));
+                const customEvent = new CustomEvent('makeMove', {
+                    bubbles: true,  // para que se propague
+                    detail: { message: move.lan }
+                });
+                this.dispatchEvent(customEvent);
+            } catch (error) {
+                console.error("Error making move:", error);
+                resetDisplayFen();
+                return;
+            }
+
+
+            ;
+
         }
 
         movesList.addEventListener("click", (event) => {
@@ -192,7 +192,6 @@ class boardComponent extends HTMLElement {
         });
 
         board.addEventListener("chessmarro-move", e => {
-            console.log(e);
             makeMove(e.detail.uci);
         });
 

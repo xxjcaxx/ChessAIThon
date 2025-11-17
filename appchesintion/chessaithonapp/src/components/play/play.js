@@ -4,6 +4,7 @@ import style from "./play.css?inline"
 import { Chess, validateFen } from 'chess.js'
 import { BehaviorSubject, Subject, fromEvent, map, filter, tap, merge, switchMap, of, throttleTime, asyncScheduler, concat, take, concatMap, distinctUntilChanged } from 'rxjs';
 import { uciToMove, chessPiecesUnicode, loadLocalStorage } from "../../chessUtils";
+import { initStyle, initTemplate } from '../componentsUtils.js';
 
 
 class PlayComponent extends HTMLElement {
@@ -14,13 +15,11 @@ class PlayComponent extends HTMLElement {
     }
 
     async connectedCallback() {
-        // Estilos
-        const styleElement = document.createElement("style");
-        styleElement.textContent = style;
-        this.append(styleElement);
-
-        // Contenido
-        this.innerHTML = template;
+        
+            this.append(
+            initStyle(style),
+            initTemplate(template)
+        );
 
         //Board
         const board = document.createElement("chess-board");
