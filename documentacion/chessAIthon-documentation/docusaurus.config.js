@@ -11,7 +11,7 @@ import {themes as prismThemes} from 'prism-react-renderer';
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: 'ChessAIthon',
-  tagline: 'Documentation for ChessAIthon — practical chess AI experiments, datasets and models',
+  tagline: 'Technical documentation for ChessAIthon — practical chess AI experiments, datasets and models',
   favicon: 'img/favicon.ico',
 
   // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
@@ -102,23 +102,6 @@ const config = {
             ],
           },
           {
-            title: 'Community',
-            items: [
-              {
-                label: 'Stack Overflow',
-                href: 'https://stackoverflow.com/questions/tagged/docusaurus',
-              },
-              {
-                label: 'Discord',
-                href: 'https://discordapp.com/invite/docusaurus',
-              },
-              {
-                label: 'X',
-                href: 'https://x.com/docusaurus',
-              },
-            ],
-          },
-          {
             title: 'More',
             items: [
               {
@@ -129,6 +112,12 @@ const config = {
           },
         ],
         copyright: `Copyright © ${new Date().getFullYear()} ChessAIthon. Built with Docusaurus.`,
+         logo: {
+          alt: 'Financiado por la Unión Europea',
+          src: 'img/erasmus_plus_ok.jpg', // Ruta relativa desde /static
+         // href: '/', // opcional: a dónde lleva el logo al hacer clic
+          width: 800, // puedes ajustar el tamaño
+        },
       },
       prism: {
         theme: prismThemes.github,

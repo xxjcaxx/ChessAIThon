@@ -3,6 +3,8 @@ import Link from '@docusaurus/Link';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import Layout from '@theme/Layout';
 import HomepageFeatures from '@site/src/components/HomepageFeatures';
+import ThemedImage from '@theme/ThemedImage';
+import useBaseUrl from '@docusaurus/useBaseUrl';
 
 import Heading from '@theme/Heading';
 import styles from './index.module.css';
@@ -12,6 +14,14 @@ function HomepageHeader() {
   return (
     <header className={clsx('hero hero--primary', styles.heroBanner)}>
       <div className="container">
+        <ThemedImage
+          alt="ChessAIthon Banner"
+          sources={{
+            light: useBaseUrl('/img/logoblanc.png'), // For light mode
+            dark: useBaseUrl('/img/logoblanc.png'),   // For dark mode
+          }}
+          style={{ maxWidth: '300px', margin: '0 auto' }}
+        />
         <Heading as="h1" className="hero__title">
           {siteConfig.title}
         </Heading>
