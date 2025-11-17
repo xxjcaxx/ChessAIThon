@@ -210,7 +210,7 @@ df_linchess
 
 <table border="1" class="dataframe">
   <thead>
-    <tr style="text-align: right;">
+    <tr >
       <th></th>
       <th>board</th>
       <th>best</th>
@@ -334,7 +334,7 @@ df_linchess[['fen_original', 'predicted_best_move','sf_best']]
 
 <table border="1" class="dataframe">
   <thead>
-    <tr style="text-align: right;">
+    <tr >
       <th></th>
       <th>fen_original</th>
       <th>predicted_best_move</th>
@@ -593,7 +593,7 @@ def read_data(file,page,size):
 
 df_chess = read_data('/content/drive/MyDrive/linchesgamesconverted0.parquet.gz',0,20000)
 ```
-
+```
     reading /content/drive/MyDrive/linchesgamesconverted0.parquet.gz 0 20000 <pyarrow._parquet.FileMetaData object at 0x7e2555174310>
       created_by: parquet-cpp-arrow version 14.0.2
       num_columns: 4
@@ -613,7 +613,7 @@ df_chess = read_data('/content/drive/MyDrive/linchesgamesconverted0.parquet.gz',
      4   predicted_best_move  20000 non-null  object
     dtypes: int64(1), object(4)
     memory usage: 759.5 MB
-
+```
 
 
 ```python

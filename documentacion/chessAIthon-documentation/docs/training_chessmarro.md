@@ -27,11 +27,11 @@ Our choice is the firts one for two principal reasons:
 
 ## Lectures
 
-* <https://www.freecodecamp.org/news/create-a-self-playing-ai-chess-engine-from-scratch/>
-* <http://cs230.stanford.edu/projects_winter_2019/reports/15808948.pdf>
-* <https://ai.stackexchange.com/questions/27336/how-does-the-alpha-zeros-move-encoding-work>
-* <http://www.diva-portal.se/smash/get/diva2:1366229/FULLTEXT01.pdf>
-* <https://github.com/asdfjkl/neural_network_chess/releases>
+* https://www.freecodecamp.org/news/create-a-self-playing-ai-chess-engine-from-scratch/
+* http://cs230.stanford.edu/projects_winter_2019/reports/15808948.pdf
+* https://ai.stackexchange.com/questions/27336/how-does-the-alpha-zeros-move-encoding-work
+* http://www.diva-portal.se/smash/get/diva2:1366229/FULLTEXT01.pdf
+* https://github.com/asdfjkl/neural_network_chess/releases
 
 
 

@@ -1,0 +1,162 @@
+/**
+ * Any CSS included here will be global. The classic template
+ * bundles Infima by default. Infima is a CSS framework designed to
+ * work well for content-centric websites.
+ */
+
+/* You can override the default Infima variables here. */
+:root {
+  /* Purple theme for homepage and accents */
+  --ifm-color-primary: #6a3fb5;
+  --ifm-color-primary-dark: #5a35a0;
+  --ifm-color-primary-darker: #4b2b86;
+  --ifm-color-primary-darkest: #331a57;
+  --ifm-color-primary-light: #7b50c9;
+  --ifm-color-primary-lighter: #8e66d9;
+  --ifm-color-primary-lightest: #a782ef;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+}
+
+/* For readability concerns, you should choose a lighter palette in dark mode. */
+[data-theme='dark'] {
+  /* Dark-mode purple variants */
+  --ifm-color-primary: #9b7be6;
+  --ifm-color-primary-dark: #8b6fe0;
+  --ifm-color-primary-darker: #795bd1;
+  --ifm-color-primary-darkest: #5c3aa8;
+  --ifm-color-primary-light: #a98ef0;
+  --ifm-color-primary-lighter: #b79ef6;
+  --ifm-color-primary-lightest: #c9bdfc;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+}
+
+/* ---- PDF-like aesthetic for documentation pages ---- */
+/* Use a soft paper background and a centered, card-like content area */
+body {
+  background: #f7f6f3; /* soft warm paper */
+  color: #222;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Homepage hero purple theme */
+.hero.hero--primary {
+  background: linear-gradient(135deg, var(--ifm-color-primary) 0%, var(--ifm-color-primary-light) 60%, #e9dcff 100%);
+  color: #fff;
+}
+.hero__subtitle {
+  color: rgba(255,255,255,0.95);
+}
+
+.hero .button--secondary {
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.18);
+}
+.hero .button--secondary:hover {
+  background: rgba(255,255,255,0.18);
+}
+
+/* Tint feature SVGs a little to match purple theme */
+.featureSvg {
+  filter: drop-shadow(0 6px 18px rgba(51,26,87,0.12));
+}
+
+/* Main docs container: white 'paper' card */
+.theme-doc-markdown, .docMainWrapper .container {
+  max-width: 980px;
+  margin: 36px auto;
+  background: #fff;
+  padding: 40px 48px;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(27,31,35,0.06);
+}
+
+/* Typography that resembles printed docs / PDFs */
+.theme-doc-markdown, .markdown {
+  font-size: 18px;
+  line-height: 1.7;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  color: #202124;
+}
+
+/* Serif headings for a more formal/paper look */
+h1, h2, h3, h4 {
+  font-family: Georgia, 'Times New Roman', Times, serif;
+  color: var(--ifm-color-primary-darkest, #205d3b);
+  margin-top: 1.2em;
+  margin-bottom: 0.35em;
+}
+
+h1 {
+  font-size: 2.1rem;
+}
+h2 {
+  font-size: 1.5rem;
+}
+h3 {
+  font-size: 1.2rem;
+}
+
+/* Blockquotes like callout boxes in PDFs */
+blockquote {
+  border-left: 4px solid rgba(46,133,85,0.12);
+  background: rgba(46,133,85,0.03);
+  padding: 12px 16px;
+  margin: 18px 0;
+  font-style: italic;
+}
+
+/* Code blocks with subtle paper-friendly style */
+pre, code[class*="language-"] {
+  background: #f5f5f7;
+  border-radius: 6px;
+  font-family: 'SFMono-Regular', Menlo, Monaco, 'Roboto Mono', 'Courier New', monospace;
+}
+
+pre {
+  padding: 16px 18px;
+  overflow: auto;
+}
+
+/* Tables: clean, readable */
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1em 0;
+}
+table th, table td {
+  border: 1px solid rgba(27,31,35,0.08);
+  padding: 8px 10px;
+}
+table th {
+  background: rgba(46,133,85,0.04);
+}
+
+/* Images: centered and framed */
+.theme-doc-markdown img, .markdown img {
+  max-width: 100%;
+  display: block;
+  margin: 18px auto;
+  box-shadow: 0 6px 18px rgba(27,31,35,0.04);
+  border-radius: 4px;
+}
+
+/* Small helpers for printable feel */
+.theme-doc-markdown .caption {
+  color: #4a4a4a;
+  font-size: 0.95rem;
+  margin-top: 6px;
+}
+
+/* Ensure desktop layout spacing doesn't feel cramped */
+@media (max-width: 900px) {
+  .theme-doc-markdown, .docMainWrapper .container {
+    padding: 20px;
+    margin: 18px;
+  }
+  .theme-doc-markdown {
+    font-size: 16px;
+  }
+}

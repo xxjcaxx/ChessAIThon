@@ -86,8 +86,8 @@ Permitir inferencia eficiente de jugadas con un modelo CNN que predice distribuc
 
 ### Endpoints expuestos
 
-- UI Gradio: http://<host>:7860/ (por defecto `0.0.0.0:7860`).
-- API REST (FastAPI): POST http://<host>:8000/predict
+- UI Gradio: http://`<host>`:7860/ (por defecto `0.0.0.0:7860`).
+- API REST (FastAPI): POST http://`<host>`:8000/predict
   - Payload JSON: `{ "fen": "<FEN>", "simulations": <N> }`
   - Respuesta JSON: `{ "move": "e2e4" }`
 
