@@ -3,7 +3,7 @@
 This is the code for the CNN:
 
 ```python
-class ChessNet(nn.Module):
+class ChessNet(nn.Module): 
     def __init__(self):
         super(ChessNet, self).__init__()
 
@@ -41,7 +41,7 @@ class ChessNet(nn.Module):
         self.fc2 = nn.Linear(lineal_channels, lineal_channels)
         self.drop2 = nn.Dropout(p=0.4)
 
-        self.fcf = nn.Linear(lineal_channels, 4096)
+        self.fcf = nn.Linear(lineal_channels, 4096)  
 
     def forward(self, x):
         # First convolution (no residual)
