@@ -1,6 +1,10 @@
+![png](./logoschess/logodegradado.png)
+
 # ChessAIThon
 
 Monorepo for the ChessAIThon (Chess Artificial Intelligence Hackathon) project.
+
+Official Web Page: https://chessaithon.pixel-online.org/
 
 This repository contains multiple subprojects (web apps, documentation site, native C libraries and Python tooling) related to building, training and deploying chess AI components used in the ChessAIThon project.
 
@@ -25,7 +29,7 @@ Quick start
 Where to go next
 
 - To run the lightweight demo: see `appchesintion/chessaithonapp/README.md`.
-- To run the Angular webapp: see `webapp/README.md`.
 - To deploy or run the model locally: see `modelDeploy/README.md`.
+- Check `documentacion/` for technical docs.
 
-If you need help, ask in the repository issue tracker or check `documentacion/` for technical docs.
+![jpg](./logoschess/erasmus_plus_ok.jpg)

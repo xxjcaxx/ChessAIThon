@@ -14,8 +14,8 @@ Below are an ASCII diagram and a Mermaid diagram that show the runtime component
                                           v
             +-----------------------------+------------------------------+
             |                           app.py                           |
-            |  - Gradio (0.0.0.0:7860)   - FastAPI (0.0.0.0:8000)         |
-            |  - get_model() (lazy init)  - predict_fn(fen, sims)         |
+            |  - Gradio (0.0.0.0:7860)   - FastAPI (0.0.0.0:8000)        |
+            |                            - predict_fn(fen, sims)         |
             +-----------------------------+------------------------------+
                                           |
                     +---------------------+---------------------+
@@ -25,10 +25,10 @@ Below are an ASCII diagram and a Mermaid diagram that show the runtime component
                     +---------------------+---------------------+
                                           |
                                           v
-                                 +-----------------+
-                                 | predict_fn      |
+                                 +-------------------------------------------+
+                                 | predict_fn                                |
                                  | (calls chesmarro_mcts_predict_chess_move) |
-                                 +-----------------+
+                                 +-------------------------------------------+
                                           |
                                           v
                          +------------------------------------+
@@ -62,13 +62,13 @@ Below are an ASCII diagram and a Mermaid diagram that show the runtime component
                             +-----------------+-----------------+
                             |                                   |
                             v                                   v
-                   +-------------------+             +-------------------------+
-                   | batch_predict_worker |  <---  input_queue  (Process)    |
-                   | (process on host)    |             | Uses model & device  |
-                   | - stack tensors      |             +-------------------------+
-                   | - model(boards)->preds       |
-                   | - preds = [UCI,...]          |
-                   +-----------+------------------+
+                   +--------------------------+          +-------------------------+
+                   | batch_predict_worker     |  <---    input_queue  (Process)    |
+                   | (process on host)        |          | Uses model & device     |
+                   | - stack tensors          |          +-------------------------+
+                   | - model(boards)->preds   |
+                   | - preds = [UCI,...]      |
+                   +-----------+--------------+
                                |
                                v
                           output_queue (task_id, uci_move)
@@ -102,7 +102,7 @@ Below are an ASCII diagram and a Mermaid diagram that show the runtime component
 
 ## Mermaid diagram
 
-The following Mermaid flowchart describes the same architecture. You can paste it into any Mermaid renderer (e.g., Markdown preview with Mermaid enabled, or mermaid.live).
+The following Mermaid flowchart describes the same architecture. 
 
 ```mermaid
 flowchart LR

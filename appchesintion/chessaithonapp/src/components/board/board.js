@@ -13,8 +13,10 @@ const renderMoves = (moves) => {
     const moveSpans = moves.map(move => {
         const moveSpan = document.createElement('span');
         moveSpan.classList.add('tag', 'is-light', 'is-clickable');
+        
         moveSpan.dataset.move = move.lan;
         moveSpan.innerHTML = `<span class="is-size-4">${move.piece}</span>${move.lan}`;
+        moveSpan.querySelector('.is-size-4').style.pointerEvents = 'none';
         moveSpan.addEventListener('mouseenter', (e) => {
             if (e.target === moveSpan) {
                 const customEvent = new CustomEvent('enterMove', {

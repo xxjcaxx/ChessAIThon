@@ -25,34 +25,17 @@ const sidebars = {
       collapsed: false,
       items: [
         'chess_computers',
-        'architecture_diagrams',
-      ],
-    },
-
-    {
-      type: 'category',
-      label: 'Models & Analysis',
-      items: [
-        'Exploring Chessmaro AI Model',
-        'deep_learning',
-        'auto_generated_technical_docs',
-      ],
-    },
-
-    {
-      type: 'category',
-      label: 'Datasets',
-      items: [
         'chess_datasets',
+        'deep_learning',
       ],
     },
-
     {
       type: 'category',
       label: 'Training & Testing',
       items: [
         'training_chessmarro',
-        'testing_chessmarro',
+        'Exploring Chessmaro AI Model',
+
       ],
     },
 
@@ -61,10 +44,20 @@ const sidebars = {
       label: 'Deployment',
       items: [
         'deploying_chessmarro',
+        'architecture_diagrams',
       ],
     },
 
-    'technical_memory',
+    {
+      type: 'category',
+      label: 'Memory',
+      items: [
+        'technical_memory',
+        'auto_generated_technical_docs',
+      ],
+    },
+
+
 
    
   ],

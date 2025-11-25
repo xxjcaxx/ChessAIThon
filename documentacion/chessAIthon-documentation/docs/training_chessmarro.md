@@ -1,4 +1,4 @@
-# Introduction
+# Training ChessMarro
 
 Chess is a great example for learning AI model creation because it has well-defined rules, a finite and discrete state space, and a deterministic nature, making it easier to model computationally. It has been a historical benchmark for AI, from Deep Blue to AlphaZero, offering rich literature and frameworks. The game’s complexity scales from simple moves to deep strategic planning, providing a natural learning curve. Additionally, vast databases of chess games make training AI models more accessible.
 

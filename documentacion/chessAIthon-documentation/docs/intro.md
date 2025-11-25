@@ -35,3 +35,12 @@ By focusing on these practical applications, ChessAIThon aims to provide VET stu
 **AI Training & Competition Framework**: Provide methodologies and software for students to work with solution datasets to train Artificial Intelligence models. This includes enabling students to fine-tune AI training and measure performance. The software will culminate in a chess and AI competition where student-trained AIs compete, reflecting the collective intelligence of each group.
 
 **Version Control Integration**: Utilize version control tools such as Git, specifically through platforms like GitHub, to ensure data continuity and seamless collaboration among partners for storing and sharing datasets of chess problem-solving challenges and solutions.
+
+> ChessAIthon is the name of the complete project. As a pun, we named ChessNet the NN base of our project. ChessMarro is the name of the AI (ChessNet+Deploy). ChessMinds is the name of the web frontend to play with ChessMarro and to create datasets. 
+
+## Slides
+
+[Project presentation](ChessAIThon-Integrating-Chess-Coding-and-AI.pdf)
+[AI presentation](Developing-a-Chess-AI-with-Convolutional-Neural-Networks.pdf)
+[MCTS presentation](Monte-Carlo-Tree-Search-Intelligent-Game-Strategy.pdf)
+[Full technical project presentation](presentacio.pdf)

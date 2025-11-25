@@ -1,80 +1,57 @@
 # Exploring Chessmaro AI Model
 
-This is the code for the CNN:
+```mermaid
+graph TD
+    subgraph Input Layer
+        A[Input: 77x8x8 Tensor Board State]
+    end
 
-```python
-class ChessNet(nn.Module): 
-    def __init__(self):
-        super(ChessNet, self).__init__()
+    subgraph Feature Extraction CNN Blocks
+        direction TB
 
-        # Model parameters
-        bit_layers = 77
-        in_channels = bit_layers
-        base_channels = 128  # Base number of channels  # Increase!!
-        kernel_size = 3
-        padding = kernel_size // 2
-        lineal_channels = 1024
+        %% Block 1: Initial Convolution
+        A --> C{Conv1: 77 -> 128 channels}
+        C --> D[Batch Norm + ReLU]
+        
+        %% Block 2: Residual Block (128 -> 256 channels)
+        D --> E_MAIN{Conv2: 128 -> 256 Main Path}
+        D --> E_SKIP{Res Conv2: 1x1, 128 -> 256 Skip Path}
+        E_MAIN --> F[Batch Norm + ReLU]
+        E_SKIP --> G(Add Residual)
+        F --> G
+        G --> H[Output: 256x8x8]
 
-        # First convolution layer (no residual needed)
-        self.conv1 = nn.Conv2d(in_channels, base_channels, kernel_size, padding=padding)
-        self.bn1 = nn.BatchNorm2d(base_channels)
+        %% Block 3: Residual Block 256 -> 512 channels
+        H --> I_MAIN{Conv3: 256 -> 512 Main Path}
+        H --> I_SKIP{Res Conv3: 1x1, 256 -> 512 Skip Path}
+        I_MAIN --> J[Batch Norm + ReLU]
+        I_SKIP --> K(Add Residual)
+        J --> K
+        K --> L[Output: 512x8x8]
 
-        # Second convolution with residual
-        self.conv2 = nn.Conv2d(base_channels, base_channels * 2, kernel_size, padding=padding)
-        self.bn2 = nn.BatchNorm2d(base_channels * 2)
-        self.res_conv2 = nn.Conv2d(base_channels, base_channels * 2, kernel_size=1)  # 1x1 conv to match channels
+        %% Block 4: Residual Block 512 -> 1024 channels
+        L --> M_MAIN{Conv4: 512 -> 1024 Main Path}
+        L --> M_SKIP{Res Conv4: 1x1, 512 -> 1024 Skip Path}
+        M_MAIN --> N[Batch Norm + ReLU]
+        M_SKIP --> O(Add Residual)
+        N --> O
+        O --> P[Output: 1024x8x8]
+    end
 
-        # Third convolution with residual
-        self.conv3 = nn.Conv2d(base_channels * 2, base_channels * 4, kernel_size, padding=padding)
-        self.bn3 = nn.BatchNorm2d(base_channels * 4)
-        self.res_conv3 = nn.Conv2d(base_channels * 2, base_channels * 4, kernel_size=1)
+    subgraph Policy Head Fully Connected
+        
+        P --> Q[Flatten 1024*8*8 = 65536 units]
+        
+        Q --> R{FC1: Linear 65536 -> 1024}
+        R --> S[ReLU + Dropout p=0.4]
 
-        # Fourth convolution with residual
-        self.conv4 = nn.Conv2d(base_channels * 4, base_channels * 8, kernel_size, padding=padding)
-        self.bn4 = nn.BatchNorm2d(base_channels * 8)
-        self.res_conv4 = nn.Conv2d(base_channels * 4, base_channels * 8, kernel_size=1)
+        S --> T{FC2: Linear 1024 -> 1024}
+        T --> U[ReLU + Dropout p=0.4]
 
-        # Fully connected layers
-        self.fc1 = nn.Linear(base_channels * 8 * 8 * 8, lineal_channels)  # Retain spatial info
-        self.drop1 = nn.Dropout(p=0.4)  # Lower dropout for better accuracy
-
-        self.fc2 = nn.Linear(lineal_channels, lineal_channels)
-        self.drop2 = nn.Dropout(p=0.4)
-
-        self.fcf = nn.Linear(lineal_channels, 4096)  
-
-    def forward(self, x):
-        # First convolution (no residual)
-        x = F.relu(self.bn1(self.conv1(x)))
-
-        # Second layer with residual
-        res = self.res_conv2(x)
-        x = F.relu(self.bn2(self.conv2(x))) + res
-
-        # Third layer with residual
-        res = self.res_conv3(x)
-        x = F.relu(self.bn3(self.conv3(x))) + res
-
-        # Fourth layer with residual
-        res = self.res_conv4(x)
-        x = F.relu(self.bn4(self.conv4(x))) + res
-
-        # Flatten while keeping spatial information
-        x = x.view(x.size(0), -1)
-
-        # Fully connected layers
-        x = F.relu(self.fc1(x))
-        x = self.drop1(x)
-
-        x = F.relu(self.fc2(x))
-        x = self.drop2(x)
-
-        x = self.fcf(x)
-
-        return x
-
+        U --> V{FCF: Linear 1024 -> 4096}
+        V --> Z[Policy Output Vector 4096 Moves]
+    end
 ```
-
 
 # Visualizing results
 

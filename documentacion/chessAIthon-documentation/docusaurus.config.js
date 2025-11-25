@@ -40,17 +40,27 @@ const config = {
     locales: ['en'],
   },
 
+  themes: [
+  
+    '@docusaurus/theme-mermaid', // ⬅️ AÑADIR ESTA LÍNEA
+  ],
+  markdown: { 
+    mermaid: true, 
+  },
+
   presets: [
     [
       'classic',
       /** @type {import('@docusaurus/preset-classic').Options} */
       ({
+   
         docs: {
           sidebarPath: './sidebars.js',
           // Edit this to point to the documentation folder in your repo
           editUrl:
             'https://github.com/xxjcaxx/ChessAIThon/tree/master/documentacion/chessAIthon-documentation/',
-        },
+         
+          },
         // Disable the blog for this documentation-focused site
         blog: false,
         theme: {
