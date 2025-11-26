@@ -38,6 +38,12 @@ class PlayComponent extends HTMLElement {
             const uci = e.detail.message;
             this.state.move = uci;
         });
+
+        this.addEventListener("playersChanged", (e) => {
+            const players = e.detail;
+            this.state.w = players.w === 'ai' ? 'AI' : 'Human';
+            this.state.b = players.b === 'ai' ? 'AI' : 'Human';
+        });
     }
 
 

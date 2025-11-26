@@ -33,7 +33,10 @@ export class GameState {
         this.decideNextMove(newGameState);
     }
     decideNextMove(newGameState) {
+        console.log("decide" + this[newGameState.currentPlayer]);
+        
         if (this[newGameState.currentPlayer] == 'AI'){
+            console.log("decide AI move");
             this.game.move(newGameState.legalMoves[Math.floor(Math.random() * newGameState.legalMoves.length)]);
              this.state$.next(createGameState(this.game));
         }

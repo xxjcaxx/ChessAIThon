@@ -8,10 +8,9 @@ import { uciToMove, chessPiecesUnicode, loadLocalStorage } from "../../chessUtil
 
 class PlayersComponent extends HTMLElement {
 
-    state = {
-        currentFen: new BehaviorSubject("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"),
-        displayFen: new BehaviorSubject("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"),
-    }
+
+    
+    
 
     async connectedCallback() {
         // Estilos
@@ -22,13 +21,21 @@ class PlayersComponent extends HTMLElement {
         // Contenido
         this.innerHTML = template;
 
-        function toggleAIInput(select, apiField) {
+        const  toggleAIInput = (select, apiField) => {
 
             if (select.value === 'ai') {
                 apiField.classList.remove('is-hidden');
             } else {
                 apiField.classList.add('is-hidden');
             }
+            const selected = {
+                w: this.querySelector(`#player1-select`).value,
+                b: this.querySelector(`#player2-select`).value,
+                wApi: this.querySelector(`#player1-api input`).value,
+                bApi: this.querySelector(`#player2-api input`).value
+            };
+            const event = new CustomEvent('playersChanged', { detail: selected });
+            this.dispatchEvent(event);
         }
 
         const players = ["player1", "player2"];
