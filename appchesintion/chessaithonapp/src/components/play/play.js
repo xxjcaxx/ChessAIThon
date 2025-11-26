@@ -5,31 +5,39 @@ import { Chess, validateFen } from 'chess.js'
 import { BehaviorSubject, Subject, fromEvent, map, filter, tap, merge, switchMap, of, throttleTime, asyncScheduler, concat, take, concatMap, distinctUntilChanged } from 'rxjs';
 import { uciToMove, chessPiecesUnicode, loadLocalStorage } from "../../chessUtils";
 import { initStyle, initTemplate } from '../componentsUtils.js';
+import { GameState } from "../../services/chessGameService.js";
 
 
 class PlayComponent extends HTMLElement {
 
-    state = {
-        currentFen: new BehaviorSubject("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"),
-        displayFen: new BehaviorSubject("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"),
-    }
+    state = new GameState("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
 
     async connectedCallback() {
-        
-            this.append(
+
+        this.append(
             initStyle(style),
             initTemplate(template)
         );
 
         //Board
         const board = document.createElement("chess-board");
-        board.dataset.fen = this.state.currentFen.getValue();
-        // Board observables
-        board.state.currentFen = this.state.currentFen;
-        board.state.displayFen = this.state.displayFen;
+
+        this.state.state$.subscribe(gs => {
+            board.dataset.fen = gs.fen;
+            board.state.currentFen.next(gs.fen);
+            board.state.displayFen.next(gs.fen);
+            board.state.currentTurn.next(gs.currentPlayer);
+            console.log(gs.fen);
+            
+        });
 
         const boardContainer = this.querySelector("#boardContainer");
         boardContainer.append(board);
+
+        board.addEventListener("makeMove", (e) => {          
+            const uci = e.detail.message;
+            this.state.move = uci;
+        });
     }
 
 

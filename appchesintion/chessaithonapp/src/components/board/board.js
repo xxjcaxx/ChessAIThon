@@ -173,7 +173,7 @@ class boardComponent extends HTMLElement {
                 localStorage.setItem('best_moves', JSON.stringify(storedBestMoves));
                 const customEvent = new CustomEvent('makeMove', {
                     bubbles: true,  // para que se propague
-                    detail: { message: move.lan }
+                    detail: { message: move }
                 });
                 this.dispatchEvent(customEvent);
             } catch (error) {
