@@ -41,8 +41,9 @@ class PlayComponent extends HTMLElement {
 
         this.addEventListener("playersChanged", (e) => {
             const players = e.detail;
-            this.state.w = players.w === 'ai' ? 'AI' : 'Human';
-            this.state.b = players.b === 'ai' ? 'AI' : 'Human';
+            this.state.players = players;
+           // this.state.w = players.w === 'ai' ? 'AI' : 'Human';
+          //  this.state.b = players.b === 'ai' ? 'AI' : 'Human';
         });
     }
 

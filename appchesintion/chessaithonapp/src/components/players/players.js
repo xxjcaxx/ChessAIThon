@@ -34,7 +34,7 @@ class PlayersComponent extends HTMLElement {
                 wApi: this.querySelector(`#player1-api input`).value,
                 bApi: this.querySelector(`#player2-api input`).value
             };
-            const event = new CustomEvent('playersChanged', { detail: selected });
+            const event = new CustomEvent('playersChanged', { detail: selected, bubbles: true });
             this.dispatchEvent(event);
         }
 
@@ -53,6 +53,9 @@ class PlayersComponent extends HTMLElement {
             select.addEventListener("change", () => {
                 toggleAIInput(select, apiField);
             });
+            apiField.addEventListener("input",()=>{
+                toggleAIInput(select, apiField);
+            })
         });
 
 
