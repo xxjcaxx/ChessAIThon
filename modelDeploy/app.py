@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 import uvicorn
 import threading
-
+from fastapi.middleware.cors import CORSMiddleware
 print("Iniciando la aplicación de despliegue del modelo (import).")
 
 # -------- Modelo lazy con lock --------
@@ -64,6 +64,13 @@ iface = gr.Interface(
 
 # -------- FastAPI --------
 app = FastAPI(title="Chess Move Predictor API")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class Request(BaseModel):
     fen: str
@@ -72,6 +79,7 @@ class Request(BaseModel):
 @app.post("/predict")
 def predict_api(req: Request):
     """Endpoint REST limpio para Postman/curl"""
+    print(req)
     result = predict_fn(req.fen, req.simulations)
     # Asegurar que el valor que se serializa a JSON sea una cadena (UCI)
     try:
