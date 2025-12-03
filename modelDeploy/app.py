@@ -9,6 +9,8 @@ from pydantic import BaseModel
 import uvicorn
 import threading
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+import asyncio
 print("Iniciando la aplicación de despliegue del modelo (import).")
 
 # -------- Modelo lazy con lock --------
@@ -87,6 +89,21 @@ def predict_api(req: Request):
     except Exception:
         move_str = repr(result)
     return {"move": move_str}
+
+
+async def event_generator():
+    counter = 1
+    while True:
+        # Yield server-sent events formatted as ' <message>\n\n'
+        yield f" Server event {counter}\n\n"
+        counter += 1
+        await asyncio.sleep(2)  # Simulate delay between messages
+
+@app.get("/predict_stream")
+async def sse_endpoint(fen, simulations):
+    print("SEEEEEEEEEEEEEEE",fen, "Simluations: ", simulations)
+    
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 # -------- Lanzamiento combinado --------
 def launch_gradio():
