@@ -42,7 +42,7 @@ export class GameState {
   }
   decideNextMove(newGameState) {
     console.log(
-      "decide" + this[newGameState.currentPlayer],
+      "decide" + this.players[newGameState.currentPlayer],
       newGameState.currentPlayer
     );
 
