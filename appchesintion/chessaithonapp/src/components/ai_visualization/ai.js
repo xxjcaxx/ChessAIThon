@@ -5,7 +5,7 @@ import { Chess, validateFen } from 'chess.js'
 import { BehaviorSubject, Subject, fromEvent, map, filter, tap, merge, switchMap, of, throttleTime, asyncScheduler, concat, take, concatMap, distinctUntilChanged } from 'rxjs';
 import { uciToMove, chessPiecesUnicode, loadLocalStorage } from "../../chessUtils";
 import { initStyle, initTemplate } from '../componentsUtils.js';
-import { GameState } from "../../services/chessGameService.js";
+import { askAIMoveTree, GameState } from "../../services/chessGameService.js";
 
 
 class aiComponent extends HTMLElement {
@@ -18,7 +18,28 @@ class aiComponent extends HTMLElement {
             initTemplate(template)
         );
 
+        const fenInput = this.querySelector("#fenInput");
+        const api = this.querySelector("#player-api");
+        const analyzeButton = this.querySelector("#analyzeButton");
+        console.log(fenInput,api,analyzeButton);
         
+
+        analyzeButton.addEventListener("click", async (e) => {
+            e.preventDefault();
+            const fen = fenInput.value;
+            const apiUrl = api.value;
+            console.log(fen,apiUrl);
+            
+
+           /* if (!validateFen(fen).valid) {
+                alert("Invalid FEN string");
+                return;
+            }*/
+            const {move,tree} = await askAIMoveTree(apiUrl,fen,10);
+            console.log(move,tree);
+        });
+
+            
         
 
     }
