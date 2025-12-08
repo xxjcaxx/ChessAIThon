@@ -5,6 +5,7 @@ import "./components/board/board.js";
 import "./components/play/play.js";
 import "./components/players/players.js";
 import "./components/representation/representation.js";
+import "./components/ai_visualization/ai.js";
 import { initChessmarroBoard } from "chessmarro-board";
 import { router } from "./router.js";
 

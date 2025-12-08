@@ -1,0 +1,31 @@
+<div class="has-background-dark has-text-white main-content container is-fluid columns p-6 is-desktop">
+    <div id="representation" class="column pt-6">
+        <h2 class="title is-3 has-text-white">AI analysis</h2>
+        <p id="aiSuggestedMove" class="has-text-white">
+            To calculate the next move, AI uses a Montecarlo Tree Search (MCTS) algorithm in combination with a neural
+            network that improves its move choices instead of random. Here you can paste the FEN and see the result and
+            the search tree.
+        </p>
+        <form class="box has-background-dark" style="max-width: 600px; margin: 0 auto;">
+            <div class="field">
+                <label class="label has-text-white">FEN String</label>
+                <div class="control">
+                    <input id="fenInput" class="input" type="text" placeholder="Enter FEN string here">
+                </div>
+            </div>
+            <div id="player-api" class="field mt-2">
+                <label class="label has-text-white">AI API URL</label>
+                <div class="control">
+                    <input class="input" type="url" placeholder="https://example.com/api/ai-player">
+                </div>
+            </div>
+            <div class="field has-text-centered mt-5">
+                <div class="control">
+                    <button id="analyzeButton" class="button is-link">Analyze Position</button>
+                </div>
+            </div>
+        </form>
+
+
+    </div>
+</div>
