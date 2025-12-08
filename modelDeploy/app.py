@@ -11,6 +11,7 @@ import threading
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 import asyncio
+import json
 print("Iniciando la aplicación de despliegue del modelo (import).")
 
 # -------- Modelo lazy con lock --------
@@ -46,7 +47,7 @@ def predict_fn(fen: str, simulations: int):
         # para que tanto Gradio (que muestra texto) como FastAPI (que serializa a JSON)
         # reciban el mismo formato consistente (por ejemplo 'e2e4').
         try:
-            return str(move) if move is not None else None
+            return str(move) if move is not None else None, tree_json
         except Exception:
             # Fallback seguro: devuelve representación fallback
             return repr(move)
@@ -80,8 +81,6 @@ class Request(BaseModel):
 
 @app.post("/predict")
 def predict_api(req: Request):
-    """Endpoint REST limpio para Postman/curl"""
-    print(req)
     result = predict_fn(req.fen, req.simulations)
     # Asegurar que el valor que se serializa a JSON sea una cadena (UCI)
     try:
@@ -104,6 +103,17 @@ async def sse_endpoint(fen, simulations):
     print("SEEEEEEEEEEEEEEE",fen, "Simluations: ", simulations)
     
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@app.post("/predict_tree")
+def predict_api(req: Request):
+    result, tree_json = predict_fn(req.fen, req.simulations)
+    # Asegurar que el valor que se serializa a JSON sea una cadena (UCI)
+    try:
+        move_str = str(result) if result is not None else None
+    except Exception:
+        move_str = repr(result)
+    return {"move": move_str, "tree": json.loads(tree_json)}
 
 # -------- Lanzamiento combinado --------
 def launch_gradio():
