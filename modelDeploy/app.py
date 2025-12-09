@@ -1,7 +1,7 @@
 import gradio as gr
 import multiprocessing as mp
 from threading import Lock
-from chessgamemultithread import chessmarro_mcts_predict_chess_move
+from chessgamemultithread import chessmarro_mcts_predict_chess_move, chessmarro_predict_top_k_moves
 from chessmodel import init_model
 
 from fastapi import FastAPI
@@ -42,6 +42,7 @@ def predict_fn(fen: str, simulations: int):
         move, tree_json = chessmarro_mcts_predict_chess_move(
             fen, simulations, model, device, num_workers=64
         )
+        
         # Normalizar la salida: devolver siempre una cadena UCI.
         # La función MCTS puede devolver un objeto `chess.Move`; forzamos a str()
         # para que tanto Gradio (que muestra texto) como FastAPI (que serializa a JSON)
@@ -81,7 +82,7 @@ class Request(BaseModel):
 
 @app.post("/predict")
 def predict_api(req: Request):
-    result = predict_fn(req.fen, req.simulations)
+    result, tree = predict_fn(req.fen, req.simulations)
     # Asegurar que el valor que se serializa a JSON sea una cadena (UCI)
     try:
         move_str = str(result) if result is not None else None

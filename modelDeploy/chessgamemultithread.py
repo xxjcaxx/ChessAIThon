@@ -30,44 +30,64 @@ if torch.cuda.is_available():
 # Función central que realiza la inferencia en la GPU. 
 # Procesa múltiples tableros a la vez (batching) para maximizar la eficiencia de la Conv2D.
 def predict_chess_moves_vectorized(boards_tensor, temperature, model):
+    # Get the batch size, which is the number of boards to process.
     B = boards_tensor.size(0)
-    device = boards_tensor.device
 
+    # Disable gradient calculations to save memory and computation time during inference.
     with torch.no_grad():
+        # Pass the batch of board features through the neural network to get raw output logits.
         logits = model(boards_tensor)  # [B,4096]
 
     # --- LEGAL MASK ---
+    # Extract the 64-channel legal move mask from the board tensor (assuming it's the last 64 channels).
+    # Flatten the 64x8x8 mask into a 4096-element boolean vector for each board.
     legal_masks = boards_tensor[:, -64:, :, :].reshape(B, 4096).bool()
 
     # --- SANITIZE LOGITS  ---
+    # Get the floating-point information for the logits' data type (e.g., float32).
     finfo = torch.finfo(logits.dtype)
-    negbig = finfo.min / 4   # valor negativo grande estable
+    # Define a numerically stable, large negative value for masking illegal moves.
+    negbig = finfo.min / 4
+    # Replace any NaN, posinf, or neginf values in the logits to ensure numerical stability.
     logits = torch.nan_to_num(logits, nan=0.0,
+                              # Clamp positive infinities to a large but stable number.
                               posinf=finfo.max/4,
+                              # Clamp negative infinities to a small but stable number.
                               neginf=finfo.min/4)
 
-    # --- MASK: movimientos ilegales a un valor muy bajo ---
+    # --- MASK: Set illegal moves to a very low value ---
+    # Set the logits for all illegal moves to the large negative value (`negbig`).
     masked = logits.masked_fill(~legal_masks, negbig)
 
     # --- SOFTMAX ---
+    # Apply temperature scaling (controls exploration) and the softmax function to get move probabilities.
     probs = torch.softmax(masked / temperature, dim=1)
 
-    # --- FILAS CON SUMA 0 / INVALIDAS ---
+    # --- HANDLE INVALID ROWS (e.g., Checkmate/Stalemate) ---
+    # Ensure all resulting probabilities are non-negative due to potential floating-point underflow.
     probs = torch.clamp(probs, min=0.0)
+    # Calculate the sum of probabilities for each board in the batch.
     row_sums = probs.sum(dim=1, keepdim=True)
+    # Identify boards where the probability sum is valid (greater than zero and finite).
     valid = (row_sums > 0) & torch.isfinite(row_sums)
 
-    # Si row inválida → prob = máscara uniformemente repartida
+    # If the probability sum is zero (invalid row), prepare a uniform distribution over all legal moves.
+    # Create a float tensor from the legal mask for the uniform distribution fallback.
     uniform = legal_masks.float()
+    # Normalize the uniform mask so that the probability sum of legal moves is exactly 1.
     uniform = uniform / uniform.sum(dim=1, keepdim=True).clamp(min=1)
 
+    # For valid rows, use the normalized predicted probabilities; otherwise, use the uniform distribution fallback.
     final_probs = torch.where(valid, probs / row_sums, uniform)
 
-    # --- SAMPLE ---
-    # multinomial requiere 2D
+        # --- SAMPLE (Standard MCTS Mode) ---
+        # Draw one sample move index from the distribution for each board.
+        # torch.multinomial requires a 2D tensor.
     idxs = torch.multinomial(final_probs, num_samples=1).squeeze(1)
 
-    # --- Convertir a UCI ---
+        # --- Convert to UCI ---
+        # Convert the selected move indices into Universal Chess Interface (UCI) string format.
+        # The function 'number_to_uci' is assumed to be accessible.
     return [number_to_uci(int(i)) for i in idxs]
 
      
@@ -304,6 +324,17 @@ class MCTSNode:
                 best_value = uct_value
                 best_node = child
         return best_node
+    
+    def uct_children(self, exploration_weight=1.4, virtual_loss_coef=0.0):
+        uct_values = []
+        for child in self.children:
+            # Use virtual_loss to penalize children currently under exploration by other threads
+            # Lower virtual_loss makes a child more attractive; subtract virtual_loss_coef * virtual_loss
+            uct_value = (child.value / (child.visits + 1)) + exploration_weight * math.sqrt(math.log(self.visits + 1) / (child.visits + 1)) - virtual_loss_coef * child.virtual_loss
+            uct_values.append((str(child.move),uct_value))
+        #print(uct_values)
+        return uct_values
+
         
     def to_dict(self, depth=3):
         node_dict = {
@@ -348,7 +379,7 @@ class MCTS:
         self.virtual_loss_coef = virtual_loss_coef
         self.virtual_loss_amount = virtual_loss_amount
 
-    def search(self):
+    def search(self, moves_top_k):
         # Usamos ThreadPoolExecutor porque la mayor parte del tiempo de MCTS 
         # (selección, expansión, backpropagation) es I/O-bound (esperando el Batcher) o CPU-bound ligero.
         # Run simulations in parallel to create concurrent model requests for batching.
@@ -377,13 +408,25 @@ class MCTS:
                 except Exception:
                     pass
 
-        # Return the best move after simulations
-        # Safe debug prints
-       # print("Root children:", len(self.root.children))
-       # try:
-       #     print(self.root.to_json())
-       # except Exception:
-       #     pass
+     
+        ################### moves_top_k 
+        children_uct_values = self.root.uct_children(exploration_weight=0)
+        print(children_uct_values)
+        cnn_prob_map = {move: prob for move, prob in moves_top_k}
+        weighted_values = []
+        for move, value in children_uct_values:
+            # Buscar la probabilidad de la CNN. 
+            # Usamos .get(move, 0.0) para que si el movimiento no está en cnn_probs,
+            # se considere que tiene una probabilidad de 0, y el resultado sea 0.
+            cnn_prob = cnn_prob_map.get(move, 0.0)
+            
+            # Calcular el nuevo valor ponderado
+            weighted_value = value * cnn_prob
+            
+            # Añadir el resultado al nuevo array
+            weighted_values.append((move, weighted_value))
+        print(weighted_values)
+
 
         best = self.root.best_child(exploration_weight=0)
         # Print average depth telemetry if we collected any
@@ -416,6 +459,9 @@ class MCTS:
         # Expand one of the children (possible moves from the current position)
         # Expand one move atomically to avoid races when multiple threads expand the same node
         legal_moves = list(node.state.legal_moves)
+  
+
+
         with node.lock:
             for move in legal_moves:
                 # Check if this state is already explored
@@ -534,14 +580,104 @@ class MCTS:
 
 # Example usage:
 # Assuming we have a chess board state (from the `chess` library) and the `get_best` function
-def get_best_move(board):
+#def get_best_move(board):
     # Your CNN function that predicts the best move for the given board
-    return predict_chess_move(board.fen(),model, device)
+#    return predict_chess_move(board.fen(),model, device)
+def chessmarro_predict_top_k_moves(fen, model, device, k=5):
+    """
+    Realiza una única inferencia vectorial con el modelo de ajedrez para predecir
+    los k movimientos con mayor probabilidad según la red neuronal.
 
+    Parámetros:
+    - fen (str): La notación FEN de la posición actual.
+    - model (nn.Module): El modelo de red neuronal cargado.
+    - device (torch.device/str): El dispositivo donde ejecutar la inferencia ('cuda' o 'cpu').
+    - k (int): El número de movimientos principales (top-k) a devolver.
+    
+    Retorna:
+    - list[tuple(str, float)]: Una lista de tuplas (movimiento_uci, probabilidad)
+      ordenada de mayor a menor probabilidad.
+    """
+    # 1. Preparar el tensor del tablero
+    # La función asume que concat_fen_legal devuelve un tensor de PyTorch (o algo convertible)
+    # y ya maneja la legalidad del movimiento.
+    board_tensor = concat_fen_legal(fen)
+    if not isinstance(board_tensor, torch.Tensor):
+        # Convertir a tensor de float32, la forma esperada por el modelo
+        board_tensor = torch.tensor(board_tensor, dtype=torch.float32)
+
+    # Añadir una dimensión de batch (de [C, H, W] a [1, C, H, W])
+    boards_tensor = board_tensor.unsqueeze(0)
+    
+    # Mover al dispositivo (CPU/GPU)
+    boards_tensor = boards_tensor.to(device)
+    
+    # 2. Realizar la predicción de probabilidades
+    # Usaremos una versión simplificada de predict_chess_moves_vectorized para obtener las probabilidades
+    # en lugar de muestrear un único movimiento.
+
+    B = boards_tensor.size(0) # B debe ser 1 en este caso
+
+    with torch.no_grad():
+        logits = model(boards_tensor)  # [1, 4096]
+
+    # --- LEGAL MASK ---
+    legal_masks = boards_tensor[:, -64:, :, :].reshape(B, 4096).bool()
+
+    # --- SANITIZE LOGITS (Reutilizando la lógica de predict_chess_moves_vectorized) ---
+    finfo = torch.finfo(logits.dtype)
+    negbig = finfo.min / 4
+    logits = torch.nan_to_num(logits, nan=0.0, posinf=finfo.max/4, neginf=finfo.min/4)
+
+    # --- MASK: Set illegal moves to a very low value ---
+    masked = logits.masked_fill(~legal_masks, negbig)
+
+    # --- SOFTMAX ---
+    # Usamos temperatura T=1.0 para obtener la probabilidad "cruda" del modelo.
+    temperature = 1.0 
+    probs = torch.softmax(masked / temperature, dim=1) # [1, 4096]
+
+    # --- HANDLE INVALID ROWS (Normalización) ---
+    probs = torch.clamp(probs, min=0.0)
+    row_sums = probs.sum(dim=1, keepdim=True)
+    valid = (row_sums > 0) & torch.isfinite(row_sums)
+    
+    # Si la fila es válida, normalizar; si no, usar distribución uniforme legal como fallback.
+    # En un escenario normal de juego, row_sums será ~1.0.
+    if valid.item():
+        final_probs = probs / row_sums
+    else:
+        # Fallback a distribución uniforme sobre legales (debería ser raro)
+        uniform = legal_masks.float()
+        final_probs = uniform / uniform.sum(dim=1, keepdim=True).clamp(min=1)
+    
+    # Asegurarse de que estamos trabajando con el tensor 1D de probabilidades para la única posición.
+    final_probs = final_probs.squeeze(0) # [4096]
+
+    # 3. Obtener el Top-K de movimientos
+    # Obtener los k índices con la mayor probabilidad.
+    top_k_values, top_k_indices = torch.topk(final_probs, k=k)
+
+    # 4. Convertir índices a movimientos UCI y emparejar con la probabilidad
+    top_moves_data = []
+    # top_k_indices y top_k_values son tensores en el dispositivo, mover a CPU para procesamiento.
+    top_k_indices_cpu = top_k_indices.cpu().numpy()
+    top_k_values_cpu = top_k_values.cpu().numpy()
+
+    for idx, prob in zip(top_k_indices_cpu, top_k_values_cpu):
+        move_uci = number_to_uci(int(idx))
+        top_moves_data.append((move_uci, float(prob)))
+
+    print(f"Top {k} moves predicted: {top_moves_data}")
+    return top_moves_data
 
 
 def chessmarro_mcts_predict_chess_move(fen, simulations, model, device, batch_size=32, flusher_interval=0.1, num_workers=20, virtual_loss_coef=1.0, virtual_loss_amount=1):
     # Set up the initial chess board state
+    
+    # Prejuicios por IA para reforzar el caracter del despligue y necesitar menos simulaciones
+    moves_top_k = chessmarro_predict_top_k_moves(fen,model,device)
+    
     board = chess.Board(fen)
 
     # Create the root node
@@ -572,14 +708,16 @@ def chessmarro_mcts_predict_chess_move(fen, simulations, model, device, batch_si
             pred = response_q.get()
         except Exception:
             # On failure, fall back to direct prediction
+            print("# On failure, fall back to direct prediction")
             pred = predict_chess_move(fen_local, model, device)
         return pred
+
 
     # Initialize MCTS with the wrapped get_best function
     mcts = MCTS(root=root, get_best_function=get_best, chess_batcher=batcher, simulations=simulations, num_workers=num_workers, virtual_loss_coef=virtual_loss_coef, virtual_loss_amount=virtual_loss_amount)
 
     # Run the MCTS algorithm and get the best move
-    best_move, json = mcts.search()
+    best_move, json = mcts.search(moves_top_k)
 
     # Optionally report flush stats before closing
     try:
@@ -606,3 +744,5 @@ def chessmarro_mcts_predict_chess_move(fen, simulations, model, device, batch_si
     # Display the best move
     print(f"The best move predicted is: {best_move}")
     return best_move, json
+
+
