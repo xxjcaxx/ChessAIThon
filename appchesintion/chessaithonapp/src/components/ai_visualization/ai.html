@@ -10,18 +10,21 @@
             <div class="field">
                 <label class="label has-text-white">FEN String</label>
                 <div class="control">
-                    <input id="fenInput" class="input" type="text" placeholder="Enter FEN string here">
+                    <input id="fenInput" class="input" type="text" placeholder="Enter FEN string here"
+                    value="8/5p1k/6p1/8/7p/6P1/7P/6K1 b - - 0 1"
+                    >
                 </div>
             </div>
-            <div id="player-api" class="field mt-2">
+            <div class="field mt-2">
                 <label class="label has-text-white">AI API URL</label>
                 <div class="control">
-                    <input class="input" type="url" placeholder="https://example.com/api/ai-player">
+                    <input id="player-api"  class="input" type="url" placeholder="https://example.com/api/ai-player"
+                    value="http://localhost:8000/predict_tree">
                 </div>
             </div>
             <div class="field has-text-centered mt-5">
                 <div class="control">
-                    <button id="analyzeButton" class="button is-link">Analyze Position</button>
+                    <button id="analyzeButton" class="button is-link">Analyze AI decision</button>
                 </div>
             </div>
         </form>

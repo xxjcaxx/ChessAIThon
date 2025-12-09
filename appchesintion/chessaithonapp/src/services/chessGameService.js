@@ -65,7 +65,20 @@ export class GameState {
       
     }
   }
-
-
-  
 }
+
+
+export const askAIMoveTree = async (url,fen, simulations) => {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      fen,
+      simulations,
+    }),
+  });
+  const data = await response.json();
+  return data;
+};
