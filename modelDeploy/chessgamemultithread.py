@@ -425,10 +425,12 @@ class MCTS:
             
             # Añadir el resultado al nuevo array
             weighted_values.append((move, weighted_value))
-        print(weighted_values)
 
+        sorted_by_value = sorted(weighted_values, key=lambda x: x[1], reverse=True)
+        print(sorted_by_value)
+       
 
-        best = self.root.best_child(exploration_weight=0)
+        #best = self.root.best_child(exploration_weight=0)
         # Print average depth telemetry if we collected any
         try:
             if 'depths' in locals() and depths:
@@ -437,7 +439,8 @@ class MCTS:
         except Exception:
             pass
 
-        return best.move if best is not None else None, self.root.to_json()
+        #return best.move if best is not None else None, self.root.to_json()
+        return sorted_by_value[0][0] if sorted_by_value else None, self.root.to_json()
 
     def _select(self):
         # Traverse down the tree to find a leaf node starting from root.
@@ -676,7 +679,7 @@ def chessmarro_mcts_predict_chess_move(fen, simulations, model, device, batch_si
     # Set up the initial chess board state
     
     # Prejuicios por IA para reforzar el caracter del despligue y necesitar menos simulaciones
-    moves_top_k = chessmarro_predict_top_k_moves(fen,model,device)
+    moves_top_k = chessmarro_predict_top_k_moves(fen,model,device,k=20)
     
     board = chess.Board(fen)
 
