@@ -6,6 +6,21 @@ import { BehaviorSubject, Subject, fromEvent, map, filter, tap, merge, switchMap
 import { uciToMove, chessPiecesUnicode, loadLocalStorage } from "../../chessUtils";
 import { initStyle, initTemplate } from '../componentsUtils.js';
 import { askAIMoveTree, GameState } from "../../services/chessGameService.js";
+import { generateMiniChessBoard } from "../../chessUtils.js";
+
+
+const addChessPiecesToTreeNode = (node,fen) => {
+    const chess = new Chess(fen);
+    const board = chess.board();
+    node.miniBoard = generateMiniChessBoard(board);
+    if (node.children) {
+        node.children.forEach(child => {
+            const move = chess.move(child.move);
+            addChessPiecesToTreeNode(child,chess.fen());
+            chess.undo();
+        });
+    }
+}
 
 
 class aiComponent extends HTMLElement {
@@ -35,8 +50,13 @@ class aiComponent extends HTMLElement {
                 alert("Invalid FEN string");
                 return;
             }*/
-            const {move,tree} = await askAIMoveTree(apiUrl,fen,10);
+            const {move,tree} = await askAIMoveTree(apiUrl,fen,100);
+            addChessPiecesToTreeNode(tree,fen);
             console.log(move,tree);
+
+            const treeGraphContainer = this.querySelector("chess-mcts-visualizer");
+            treeGraphContainer.treeData = tree;
+            
         });
 
             
