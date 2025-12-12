@@ -58,6 +58,19 @@ class PlayersComponent extends HTMLElement {
             })
         });
 
+        // Botón de inicio de juego
+        this.querySelector('#start_game').addEventListener('click', (e) => {
+            e.preventDefault();
+            const selected = {
+                w: this.querySelector(`#player1-select`).value,
+                b: this.querySelector(`#player2-select`).value,
+                wApi: this.querySelector(`#player1-api input`).value,
+                bApi: this.querySelector(`#player2-api input`).value
+            };
+            const event = new CustomEvent('startGame', { detail: selected, bubbles: true });
+            this.dispatchEvent(event);
+        });
+
 
 
     }

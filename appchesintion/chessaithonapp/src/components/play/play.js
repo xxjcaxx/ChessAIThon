@@ -43,6 +43,8 @@ class PlayComponent extends HTMLElement {
             const players = e.detail;
             this.state.players = players;
         });
+
+        // Start game button
     }
 
 

@@ -49,26 +49,27 @@ export class GameState {
     if (this.players[newGameState.currentPlayer] == "ai") {
       console.log("decide AI move", this.players);
       // this.game.move(newGameState.legalMoves[Math.floor(Math.random() * newGameState.legalMoves.length)]);
-      fetch(this.players[newGameState.currentPlayer+"Api"], {
+      fetch(this.players[newGameState.currentPlayer + "Api"], {
         method: "POST",
         headers: {
-            "Content-Type": "application/json"
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({
-            fen: newGameState.fen,
-            simulations: 10  // mejor como número
+          fen: newGameState.fen,
+          simulations: 10  // mejor como número
         })
-    }).then(response => response.json()).then(m =>{
-        this.game.move(m.move);
-        this.state$.next(createGameState(this.game));
+      }).then(response => response.json()).then(m => {
+        //this.game.move(m.move);
+        //this.state$.next(createGameState(this.game));
+        this.move = m.move;
       });
-      
+
     }
   }
 }
 
 
-export const askAIMoveTree = async (url,fen, simulations) => {
+export const askAIMoveTree = async (url, fen, simulations) => {
   const response = await fetch(url, {
     method: "POST",
     headers: {
