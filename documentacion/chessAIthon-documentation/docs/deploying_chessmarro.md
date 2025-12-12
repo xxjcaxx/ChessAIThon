@@ -169,3 +169,219 @@ When moving tensors from CPU → GPU, pinned (page-locked) memory enables:
 - Overlap between data transfer and kernel execution
 - Enables the GPU to begin computation while copying from CPU memory.
 - This reduces latency and improves concurrency.
+
+
+
+# **ChessAIThon – Deployment Manual (Docker + NVIDIA GPU Support)**
+
+This guide explains how to deploy the *ChessAIThon* model on an Ubuntu system using Docker, Docker Compose, and the NVIDIA Container Toolkit for GPU acceleration.
+
+---
+
+# **1. Update System and Install Required Packages**
+
+Update package lists and install certificates + curl:
+
+```bash
+sudo apt update
+sudo apt install ca-certificates curl
+```
+
+---
+
+# **2. Add Docker’s Official GPG Key and Repository**
+
+Create directory for Docker’s keyrings:
+
+```bash
+sudo install -m 0755 -d /etc/apt/keyrings
+```
+
+Download Docker’s GPG key:
+
+```bash
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+```
+
+Add Docker repository:
+
+```bash
+sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
+Types: deb
+URIs: https://download.docker.com/linux/ubuntu
+Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+Components: stable
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
+```
+
+Update package lists:
+
+```bash
+sudo apt update
+```
+
+---
+
+# **3. Install Docker Engine and Plugins**
+
+```bash
+sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+```
+
+Verify Docker works:
+
+```bash
+sudo docker run hello-world
+```
+
+Check Docker Compose:
+
+```bash
+docker compose
+```
+
+---
+
+# **4. Clone the ChessAIThon Repository**
+
+```bash
+git clone https://github.com/xxjcaxx/ChessAIThon.git
+cd ChessAIThon/
+ls
+```
+
+Navigate to the deployment directory:
+
+```bash
+cd modelDeploy/
+ls
+```
+
+---
+
+# **5. Install NVIDIA Drivers (for GPU Support)**
+
+Check for NVIDIA GPU:
+
+```bash
+lspci | grep -i nvidia
+```
+
+Automatically install the recommended drivers:
+
+```bash
+sudo ubuntu-drivers autoinstall
+```
+
+Reboot:
+
+```bash
+sudo reboot
+```
+
+After reboot, confirm GPU is detected:
+
+```bash
+nvidia-smi
+```
+
+---
+
+# **6. Place the Trained Model in the Deployment Folder**
+
+Move your trained model file into *modelDeploy/*:
+
+```bash
+mv modelo_entrenado_chessintionv2.pth ChessAIThon/modelDeploy/
+cd ChessAIThon/modelDeploy/
+ls
+```
+
+---
+
+# **7. (Initial Attempt) Start Docker Compose**
+
+```bash
+sudo docker compose up -d
+sudo docker compose logs -f
+```
+
+If the container fails due to missing GPU runtime, continue with the next section.
+
+---
+
+# **8. Install NVIDIA Container Toolkit (GPU Support for Docker)**
+
+Add NVIDIA GPG key:
+
+```bash
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
+  | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+```
+
+Add the NVIDIA container repository:
+
+```bash
+curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list \
+  | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#' \
+  | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+```
+
+Update package lists:
+
+```bash
+sudo apt update
+```
+
+Install NVIDIA Docker toolkit:
+
+```bash
+sudo apt install -y nvidia-container-toolkit
+```
+
+Configure Docker to use the NVIDIA runtime:
+
+```bash
+sudo nvidia-ctk runtime configure --runtime=docker
+```
+
+Restart Docker:
+
+```bash
+sudo systemctl restart docker
+```
+
+Verify GPU works inside Docker:
+
+```bash
+docker run --rm --gpus all nvidia/cuda:12.3.0-base nvidia-smi
+sudo docker run --rm --gpus all nvidia/cuda:12.3.0-base nvidia-smi
+```
+
+---
+
+# **9. Start the ChessAIThon Deployment with GPU Support**
+
+Navigate to the deployment directory:
+
+```bash
+cd ChessAIThon/modelDeploy/
+```
+
+Run Docker Compose:
+
+```bash
+sudo docker compose up -d
+sudo docker compose logs -f
+```
+
+This should successfully start the model with GPU acceleration.
+
+---
+
+# **Deployment Completed**
+
+Your ChessAIThon AI chess model is now deployed in a Docker environment with full NVIDIA GPU support.
+
