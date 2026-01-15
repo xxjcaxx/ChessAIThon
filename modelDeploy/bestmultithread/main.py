@@ -1,9 +1,12 @@
 # main.py
 import multiprocessing as mp
+from threading import Lock
+import threading
 import uvicorn
-from api import create_api
-from inference_server import inference_server
-from chessgamemultithread import ChessBatcher
+from .api import create_api
+from .inference_server import inference_server
+from chessmodel import init_model
+from .batcher import batcher_loop
 #from mcts_worker import mcts_worker
 #from gradio_app import launch_gradio
 
@@ -34,17 +37,51 @@ def get_model():
 # Finalmente, el MCTS devuelve el mejor movimiento encontrado.
 # MCTS necesita también de un proceso que escuche peticiones de inferencia de cualquier worker o simulación interna del worker.
 # Ese proceso batcher une las peticiones en batches y las envía al servidor de inferencia.
-def mcts_worker(inference_q, inference_response_q, mcts_result_q):
-    id = mp.current_process().pid
+def mcts_worker(batcher_q, mcts_result_q, worker_response_queue, id):
     print("MCTS worker started", id)
-    for _ in range(10):
-        inference_q.put(("_task"+str(_), None))
-        response = inference_response_q.get()
+
+    local_q = mp.Queue()
+    SENTINEL = None
+
+    def simulation(thread_id):
+        for i in range(50):
+            local_q.put(str(id)+"/"+str(thread_id)+"/"+str(i))
+            #batcher_q.put((id, str(id)+"/"+str(thread_id)+"/"+str(i)))
+            #response = worker_response_queue.get()
+    
+    def sender():
+        while True:
+            item = local_q.get()
+            if item is SENTINEL:
+                break
+            
+            try:
+                batcher_q.put((id, item), timeout=1.0)
+            except queue.Full:
+                print(f"Worker {id} bloqueado: batcher_q está llena")
+            
+
+    threads = []
+
+    sender_thread = threading.Thread(target=sender)
+    #sender_thread.daemon = True
+    sender_thread.start()
+    for t in range(5):
+        th = threading.Thread(target=simulation, args=(t,))
+        th.start()
+        threads.append(th)
+    for th in threads:
+        th.join()
+
+    local_q.put(SENTINEL)
+    sender_thread.join()
+        #batcher_q.put((id, str(id)+"/"+str(_)))
+        #response = worker_response_queue.get()
         #print(f"MCTS worker {id} received response: {response}")
     mcts_result_q.put((id, f"move_from_worker_{id}"))
     print("MCTS worker finished", id)
 
-def task_listener(task_q, mcts_result_q, inference_q, inference_response_q, tasks_result_q):
+def task_listener(task_q, mcts_result_q, batcher_q, tasks_result_q, worker_response_queues):
     print("Task listener started")
     while True:
         task = task_q.get()
@@ -52,9 +89,9 @@ def task_listener(task_q, mcts_result_q, inference_q, inference_response_q, task
         workers = [
             mp.Process(
                 target=mcts_worker,
-                args=(inference_q, inference_response_q, mcts_result_q),
+                args=(batcher_q, mcts_result_q, worker_response_queues[i], i),
             )
-            for _ in range(mp.cpu_count())
+            for i in range(mp.cpu_count())
         ]
         for w in workers:
             w.start()
@@ -75,6 +112,8 @@ def main():
     task_q = mp.Queue()    # Queue for MCTS tasks
     mcts_result_q = mp.Queue()  # Queue for MCTS results
     tasks_result_q = mp.Queue() # Queue for final task results
+    batcher_q = mp.Queue()  # Queue for batcher requests
+    worker_response_queues = [mp.Queue(maxsize=128) for _ in range(mp.cpu_count())]
 
     # Start the inference server process
     gpu = mp.Process(
@@ -86,19 +125,22 @@ def main():
     # Start the task listener process
     task_listener_process = mp.Process(
         target=task_listener,
-        args=(task_q, mcts_result_q, inference_q, inference_response_q, tasks_result_q),
+        args=(task_q, mcts_result_q, batcher_q, tasks_result_q, worker_response_queues),
     )
     task_listener_process.start()
+
+    # Start the batcher process
+    batcher = mp.Process(target=batcher_loop, args=(batcher_q, worker_response_queues))
+    batcher.start()
 
     # Start the FastAPI server
     api_app = create_api(task_q, tasks_result_q)
     uvicorn.run(api_app, host="0.0.0.0", port=8000)
 
-    # Start the batcher process for MCTS inference requests
-    batcher = ChessBatcher(64, model, device, manager=manager, flusher_interval=flusher_interval)
 
-if __name__ == "__main__":
-    mp.set_start_method("spawn", force=True)
-    mp.freeze_support()
+
+
+def run():
+    print("Starting main process...", __name__)
     get_model()
     main()
