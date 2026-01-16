@@ -7,6 +7,7 @@ from .api import create_api
 from .inference_server import inference_server
 from chessmodel import init_model
 from .batcher import batcher_loop
+import queue
 #from mcts_worker import mcts_worker
 #from gradio_app import launch_gradio
 
@@ -29,43 +30,59 @@ def get_model():
                     _model, _device = None, None
     return _model, _device
 
-# MCTS worker function. Esta función llama al mcts, el cual a su vez llama al servidor de inferencia.
-# El servidor de inferencia está en otro proceso y se comunica mediante colas.
-# El servidor de inferencia utiliza la GPU para hacer las predicciones.
-# El MCTS también crea procesos para paralelizar las simulaciones.
-# Cada proceso de MCTS envía solicitudes de inferencia al servidor de inferencia y espera las respuestas.
-# Finalmente, el MCTS devuelve el mejor movimiento encontrado.
-# MCTS necesita también de un proceso que escuche peticiones de inferencia de cualquier worker o simulación interna del worker.
-# Ese proceso batcher une las peticiones en batches y las envía al servidor de inferencia.
-def mcts_worker(batcher_q, mcts_result_q, worker_response_queue, id):
-    print("MCTS worker started", id)
 
-    local_q = mp.Queue()
+def mcts_worker(batcher_q, mcts_result_q, worker_response_queue, id, task):
+    #print("MCTS worker started", id)
+
+    try:
+        while True:
+            worker_response_queue.get_nowait()   # Limpiamos la cola de respuestas antiguas
+    except queue.Empty:
+        pass
+
+    local_q = queue.Queue()
+    thread_responses = {t: queue.Queue() for t in range(5)}
     SENTINEL = None
+    fen = task[1]
+    simulations = task[2]
 
     def simulation(thread_id):
-        for i in range(50):
-            local_q.put(str(id)+"/"+str(thread_id)+"/"+str(i))
-            #batcher_q.put((id, str(id)+"/"+str(thread_id)+"/"+str(i)))
-            #response = worker_response_queue.get()
+        for i in range(simulations):
+            local_q.put((thread_id, i))  #fen
+            result = thread_responses[thread_id].get()
+            
     
     def sender():
         while True:
             item = local_q.get()
             if item is SENTINEL:
                 break
-            
             try:
                 batcher_q.put((id, item), timeout=1.0)
             except queue.Full:
                 print(f"Worker {id} bloqueado: batcher_q está llena")
+
+    def receiver():
+        """Escucha respuestas globales y las reparte a los threads locales"""
+        while True:
+            # Se espera que el batcher devuelva (thread_id, result_data)
+            response = worker_response_queue.get()
+            if response is SENTINEL: break
             
+            _, data = response
+            t_id = data[0]  # Extraemos el id del thread
+            # Entregamos el resultado al thread que lo pidió
+            if t_id in thread_responses:
+                thread_responses[t_id].put(data)            
 
     threads = []
 
     sender_thread = threading.Thread(target=sender)
-    #sender_thread.daemon = True
     sender_thread.start()
+    receiver_thread = threading.Thread(target=receiver)
+    receiver_thread.start()
+
+
     for t in range(5):
         th = threading.Thread(target=simulation, args=(t,))
         th.start()
@@ -74,10 +91,10 @@ def mcts_worker(batcher_q, mcts_result_q, worker_response_queue, id):
         th.join()
 
     local_q.put(SENTINEL)
+    worker_response_queue.put(SENTINEL)
     sender_thread.join()
-        #batcher_q.put((id, str(id)+"/"+str(_)))
-        #response = worker_response_queue.get()
-        #print(f"MCTS worker {id} received response: {response}")
+    receiver_thread.join()
+        
     mcts_result_q.put((id, f"move_from_worker_{id}"))
     print("MCTS worker finished", id)
 
@@ -89,7 +106,7 @@ def task_listener(task_q, mcts_result_q, batcher_q, tasks_result_q, worker_respo
         workers = [
             mp.Process(
                 target=mcts_worker,
-                args=(batcher_q, mcts_result_q, worker_response_queues[i], i),
+                args=(batcher_q, mcts_result_q, worker_response_queues[i], i, task),
             )
             for i in range(mp.cpu_count())
         ]
@@ -98,7 +115,7 @@ def task_listener(task_q, mcts_result_q, batcher_q, tasks_result_q, worker_respo
         for w in workers:
             w.join()
 
-        print("All MCTS workers finished for task:", task, mcts_result_q)
+        print("All MCTS workers finished for task:", task)
         # Mock result after all workers are done
         results = [mcts_result_q.get() for _ in range(mp.cpu_count())]
         tasks_result_q.put((task[0], results))  # Just a placeholder
@@ -118,7 +135,7 @@ def main():
     # Start the inference server process
     gpu = mp.Process(
         target=inference_server,
-        args=(inference_q, inference_response_q),
+        args=(inference_q, inference_response_q, _model, _device),
     )
     gpu.start()
 
@@ -130,7 +147,7 @@ def main():
     task_listener_process.start()
 
     # Start the batcher process
-    batcher = mp.Process(target=batcher_loop, args=(batcher_q, worker_response_queues))
+    batcher = mp.Process(target=batcher_loop, args=(batcher_q, worker_response_queues, inference_q, inference_response_q))
     batcher.start()
 
     # Start the FastAPI server

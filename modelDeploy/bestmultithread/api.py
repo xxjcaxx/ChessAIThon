@@ -19,6 +19,7 @@ def create_api(task_q, tasks_result_q):
 
         while True:
             rid, move = tasks_result_q.get()
+            print("Checking result:", rid, move)
             if rid == task_id:
                 return {"move": move}
 

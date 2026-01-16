@@ -8,7 +8,7 @@ batch_count = 0
 batch_timeout_counter = 0
 
 
-def batcher_loop(batcher_q, worker_response_queues):
+def batcher_loop(batcher_q, worker_response_queues, inference_q, inference_response_q):
     global avg_batch_size, batch_count, batch_timeout_counter
     print("Batcher started")
     batch = []
@@ -29,27 +29,30 @@ def batcher_loop(batcher_q, worker_response_queues):
 
         # Si batch completo
         if len(batch) >= BATCH_SIZE:
-            process_batch(batch, worker_response_queues)
+            process_batch(batch, worker_response_queues, inference_q, inference_response_q)
             batch = []
             batch_start = None
             continue
 
         # Si pasó TIMEOUT y hay algo pendiente
         if batch and (time.time() - batch_start) >= TIMEOUT:
-            process_batch(batch, worker_response_queues)
+            process_batch(batch, worker_response_queues, inference_q, inference_response_q)
             batch = []
             #last_flush = time.time()
             batch_start = None
             batch_timeout_counter += 1
 
-def process_batch(batch, worker_response_queues):
-    inputs = [x[1] for x in batch]
-    global avg_batch_size, batch_count, batch_timeout_counter
-    batch_count += 1
-    avg_batch_size += (len(batch) - avg_batch_size) / batch_count
-    print("process batch",batch,len(batch), avg_batch_size, batch_timeout_counter, batch_count)
-    
-    #outputs = inputs #model_infer(inputs)  # UNA llamada al modelo
+def process_batch(batch, worker_response_queues, inference_q, inference_response_q):
+    #inputs = [x[1] for x in batch]
+    #global avg_batch_size, batch_count, batch_timeout_counter
+    #batch_count += 1
+    #avg_batch_size += (len(batch) - avg_batch_size) / batch_count
+    #print("process batch",batch,len(batch), avg_batch_size, batch_timeout_counter, batch_count)
+    inference_q.put(batch)
 
-    #for (id_worker, _), out in zip(batch, outputs):
-    #    worker_response_queues[id_worker].put(out)
+    predictions = inference_response_q.get()
+    #print(predictions)
+    outputs = batch
+
+    for (id_worker, _), out in zip(batch, outputs):
+        worker_response_queues[id_worker].put(out)
