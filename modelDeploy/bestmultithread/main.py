@@ -7,6 +7,7 @@ from .api import create_api
 from .inference_server import inference_server
 from chessmodel import init_model
 from .batcher import batcher_loop
+from .mcts import mcts_worker
 import queue
 #from mcts_worker import mcts_worker
 #from gradio_app import launch_gradio
@@ -31,72 +32,7 @@ def get_model():
     return _model, _device
 
 
-def mcts_worker(batcher_q, mcts_result_q, worker_response_queue, id, task):
-    #print("MCTS worker started", id)
 
-    try:
-        while True:
-            worker_response_queue.get_nowait()   # Limpiamos la cola de respuestas antiguas
-    except queue.Empty:
-        pass
-
-    local_q = queue.Queue()
-    thread_responses = {t: queue.Queue() for t in range(5)}
-    SENTINEL = None
-    fen = task[1]
-    simulations = task[2]
-
-    def simulation(thread_id):
-        for i in range(simulations):
-            local_q.put((thread_id, i))  #fen
-            result = thread_responses[thread_id].get()
-            
-    
-    def sender():
-        while True:
-            item = local_q.get()
-            if item is SENTINEL:
-                break
-            try:
-                batcher_q.put((id, item), timeout=1.0)
-            except queue.Full:
-                print(f"Worker {id} bloqueado: batcher_q está llena")
-
-    def receiver():
-        """Escucha respuestas globales y las reparte a los threads locales"""
-        while True:
-            # Se espera que el batcher devuelva (thread_id, result_data)
-            response = worker_response_queue.get()
-            if response is SENTINEL: break
-            
-            _, data = response
-            t_id = data[0]  # Extraemos el id del thread
-            # Entregamos el resultado al thread que lo pidió
-            if t_id in thread_responses:
-                thread_responses[t_id].put(data)            
-
-    threads = []
-
-    sender_thread = threading.Thread(target=sender)
-    sender_thread.start()
-    receiver_thread = threading.Thread(target=receiver)
-    receiver_thread.start()
-
-
-    for t in range(5):
-        th = threading.Thread(target=simulation, args=(t,))
-        th.start()
-        threads.append(th)
-    for th in threads:
-        th.join()
-
-    local_q.put(SENTINEL)
-    worker_response_queue.put(SENTINEL)
-    sender_thread.join()
-    receiver_thread.join()
-        
-    mcts_result_q.put((id, f"move_from_worker_{id}"))
-    print("MCTS worker finished", id)
 
 def task_listener(task_q, mcts_result_q, batcher_q, tasks_result_q, worker_response_queues):
     print("Task listener started")

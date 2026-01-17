@@ -48,11 +48,12 @@ def process_batch(batch, worker_response_queues, inference_q, inference_response
     #batch_count += 1
     #avg_batch_size += (len(batch) - avg_batch_size) / batch_count
     #print("process batch",batch,len(batch), avg_batch_size, batch_timeout_counter, batch_count)
+    print("Batcher processing batch of size:", len(batch))
     inference_q.put(batch)
 
     predictions = inference_response_q.get()
     #print(predictions)
-    outputs = batch
+    outputs = predictions  # [((id_worker, (id_thread, fen) ), move)]
 
     for (id_worker, _), out in zip(batch, outputs):
         worker_response_queues[id_worker].put(out)
