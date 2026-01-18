@@ -21,11 +21,13 @@ def batcher_loop(batcher_q, worker_response_queues, inference_q, inference_respo
     while True:
         try:
             item = batcher_q.get(timeout=GET_TIMEOUT)
+            #print("Batcher received item from worker:", item)
             if not batch:
                 batch_start = time.time()
             batch.append(item)
         except queue.Empty:
             pass
+
 
         # Si batch completo
         if len(batch) >= BATCH_SIZE:
@@ -48,7 +50,7 @@ def process_batch(batch, worker_response_queues, inference_q, inference_response
     #batch_count += 1
     #avg_batch_size += (len(batch) - avg_batch_size) / batch_count
     #print("process batch",batch,len(batch), avg_batch_size, batch_timeout_counter, batch_count)
-    print("Batcher processing batch of size:", len(batch))
+    #print("Batcher processing batch of size:", len(batch))
     inference_q.put(batch)
 
     predictions = inference_response_q.get()

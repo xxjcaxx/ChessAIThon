@@ -66,8 +66,58 @@ def predict_chess_moves_vectorized(boards_tensor, temperature, model):
     return [number_to_uci(int(i)) for i in idxs]
 
 
-def inference_server(request_q, response_q, model, device, batch_size=32, timeout=0.05):
+def predict_ordered_moves_batch(boards_tensor, temperature, model):
+    B = boards_tensor.size(0)
+
+    with torch.no_grad():
+        logits = model(boards_tensor)  # Output de la red [B, 4096]
+
+    # --- MÁSCARA LEGAL ---
+    # Extraemos la máscara de movimientos legales del tensor (últimos 64 canales)
+    legal_masks = boards_tensor[:, -64:, :, :].reshape(B, 4096).bool()
+
+    # --- ESTABILIZACIÓN Y MÁSCARA ---
+    finfo = torch.finfo(logits.dtype)
+    negbig = finfo.min / 4
+    logits = torch.nan_to_num(logits, nan=0.0, posinf=finfo.max/4, neginf=finfo.min/4)
     
+    # Aplicamos la máscara: los movimientos ilegales tendrán un valor bajísimo
+    masked = logits.masked_fill(~legal_masks, negbig)
+
+    # --- SOFTMAX (Probabilidades) ---
+    # Usamos la temperatura para suavizar o acentuar la confianza de la red
+    probs = torch.softmax(masked / temperature, dim=1)
+
+    all_results = []
+
+    # Iteramos sobre el batch para extraer y ordenar las jugadas legales
+    for b in range(B):
+        board_probs = probs[b]
+        board_mask = legal_masks[b]
+
+        # Extraemos solo los índices de los movimientos que son legales
+        legal_indices = torch.nonzero(board_mask).squeeze(1)
+        
+        # Obtenemos las probabilidades de esos movimientos legales
+        legal_probs = board_probs[legal_indices]
+
+        # Ordenamos de mayor a menor probabilidad
+        sorted_probs, sorted_order = torch.sort(legal_probs, descending=True)
+        sorted_indices = legal_indices[sorted_order]
+
+        # Convertimos a formato (UCI, Score)
+        moves_with_scores = [
+            (number_to_uci(int(idx)), float(score)) 
+            for idx, score in zip(sorted_indices, sorted_probs)
+        ]
+        
+        all_results.append(moves_with_scores)
+
+    return all_results
+
+
+def inference_server(request_q, response_q, model, device, batch_size=32, timeout=0.05):
+    print("[GPU] Inference server started")
     model.eval()
 
     boards = []
@@ -91,7 +141,8 @@ def inference_server(request_q, response_q, model, device, batch_size=32, timeou
        
             boards_tensor = torch.stack(boards)
             boards_tensor = boards_tensor.to(device)
-            preds = predict_chess_moves_vectorized(boards_tensor, 1.2, model)
+            preds = predict_ordered_moves_batch(boards_tensor, 1.2, model)
+            #print(preds)
             results = list(zip(task, preds))  # [((id_worker, (id_thread, fen) ), move)]  [((23, (3, 'rnbqkb1r/pppppppp/5n2/8/8/5N2/PPPPPPPP/RNBQKB1R w KQkq - 2 3')), 'f3e5'), ((23, (1, 
             response_q.put(results)
             boards = []

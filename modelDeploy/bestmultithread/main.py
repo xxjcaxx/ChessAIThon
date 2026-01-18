@@ -36,6 +36,7 @@ def get_model():
 
 def task_listener(task_q, mcts_result_q, batcher_q, tasks_result_q, worker_response_queues):
     print("Task listener started")
+    n_workers = 1 #mp.cpu_count()
     while True:
         task = task_q.get()
         print("Task listener received task:", task)
@@ -44,7 +45,7 @@ def task_listener(task_q, mcts_result_q, batcher_q, tasks_result_q, worker_respo
                 target=mcts_worker,
                 args=(batcher_q, mcts_result_q, worker_response_queues[i], i, task),
             )
-            for i in range(mp.cpu_count())
+            for i in range(n_workers)
         ]
         for w in workers:
             w.start()
@@ -53,7 +54,7 @@ def task_listener(task_q, mcts_result_q, batcher_q, tasks_result_q, worker_respo
 
         print("All MCTS workers finished for task:", task)
         # Mock result after all workers are done
-        results = [mcts_result_q.get() for _ in range(mp.cpu_count())]
+        results = [mcts_result_q.get() for _ in range(n_workers)]
         tasks_result_q.put((task[0], results))  # Just a placeholder
     print("Task listener finished")    
 
