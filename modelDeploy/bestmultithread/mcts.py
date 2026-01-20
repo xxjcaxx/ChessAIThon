@@ -6,6 +6,7 @@ import chess
 import random
 import math
 import json
+from concurrent.futures import ThreadPoolExecutor
 
 def normalize_moves(moves):
     total = sum(score for _, score in moves)
@@ -26,6 +27,8 @@ class MCTSNode:
         # Guardamos los movimientos que get_best_function nos dio.
         # Si priority_moves es [(move1, score1), (move2, score2)...]
         self.untried_moves = priority_moves if priority_moves is not None else []
+        self.vloss = 0  # Contador de pérdida virtual
+        self.lock = threading.Lock() # Para proteger cambios en el nodo
         
 
     def is_fully_expanded(self):
@@ -45,21 +48,25 @@ class MCTSNode:
         sqrt_total_visits = math.sqrt(self.visits + 1)
 
         for child in self.children:
-            # 1. Q: El valor promedio (explotación)
+
+            with child.lock:
+                # Calculamos Q restando la pérdida virtual
+                # (child.visits + child.vloss) asegura que el denominador suba
+                # (child.value - child.vloss) asegura que el valor baje
+                v_loss_penalty = child.vloss * 1.0 # Penalización ajustable
+                # 1. Q: El valor promedio (explotación)
             # Valor relativo: si es turno de negras, el valor se invierte
-            q_value = child.value / (child.visits + 1)
-            #actual_q = q_value if is_white_to_move else -q_value
-            
-            # 2. U: El factor de confianza/priors (exploración inteligente)
+                q_value = (child.value - v_loss_penalty) / (child.visits + child.vloss + 1)
+                  # 2. U: El factor de confianza/priors (exploración inteligente)
             # Usamos el prior_p (score de la red)
-            u_value = c_puct * child.prior_p * (sqrt_total_visits / (1 + child.visits))
-            
-            # PUCT = Q + U
+                u_value = c_puct * child.prior_p * (sqrt_total_visits / (1 + child.visits + child.vloss))
+                
             puct_score = q_value + u_value
-            
             if puct_score > best_value:
                 best_value = puct_score
                 best_node = child
+
+            
         return best_node
         
     def to_dict(self, depth=3):
@@ -79,15 +86,89 @@ class MCTSNode:
 
 # Define the MCTS algorithm
 class MCTS:
-    def __init__(self, root_state, get_best_function, simulations=100):
+    def __init__(self, root_state, get_best_function, simulations=100, puct=1.4):
         #print("Initializing MCTS")
         moves_with_scores = normalize_moves(get_best_function(root_state)) 
-        print("Initial moves with scores:", moves_with_scores)
-        print("All legal moves:", [move.uci() for move in root_state.legal_moves])
+        print("Initial moves with scores:", moves_with_scores[0])
+        #print("All legal moves:", [move.uci() for move in root_state.legal_moves])
+
+
         self.root = MCTSNode(root_state, priority_moves=moves_with_scores)
+        # 2. EXPANDIR LA RAÍZ INMEDIATAMENTE
+        # Esto garantiza que root.children nunca esté vacío cuando los hilos terminen
+        for move_str, score in moves_with_scores:
+            new_state = root_state.copy()
+            new_state.push(chess.Move.from_uci(move_str))
+            child_node = MCTSNode(new_state, parent=self.root, move=move_str, prior_p=score)
+            self.root.children.append(child_node)
+
+        # Marcar como expandido
+        self.root.untried_moves = []
+
         self.get_best_function = get_best_function  # Function to get the best move
         self.simulations = simulations  # Number of MCTS simulations
+        self.puct = puct  # PUCT exploration constant
         #print("MCTS initialized with root state:", root_state.fen(), self.root.untried_moves) 
+
+    def _apply_vloss(self, path):
+        for node in path:
+            with node.lock:
+                node.vloss += 1
+
+    def _remove_vloss(self, path):
+        for node in path:
+            with node.lock:
+                node.vloss -= 1
+    
+    def multi_thread_run(self, num_simulations):
+        for _ in range(num_simulations):
+            self.thread_search()
+
+    def thread_search(self):
+        path = []
+        node = self.root
+        path.append(node)
+        
+        while node is not None and node.is_fully_expanded() and not node.state.is_game_over():
+            next_node = node.best_child(self.puct)
+            if next_node is None: # Si no hay hijos disponibles, nos quedamos en el actual
+                break
+            node = next_node
+            path.append(node)
+    
+        if node is None: return # Seguridad extrema
+        
+        self._apply_vloss(path)
+
+        try:
+            if not node.state.is_game_over():
+                # BLOQUEO DE EXPANSIÓN: Solo un hilo expande el nodo
+                with node.lock:
+                    needs_expansion = (not node.children and not node.untried_moves)
+                
+                if needs_expansion:
+                    # El hilo libera el lock del nodo mientras espera a la GPU (get_best_move)
+                    # Esto permite que otros hilos sigan usando el árbol
+                    moves_with_scores = normalize_moves(self.get_best_function(node.state))
+                    
+                    with node.lock:
+                        node.untried_moves = moves_with_scores
+                        # Expandimos inmediatamente un hijo para que el nodo ya no cuente como "hoja"
+                        if node.untried_moves:
+                            move_str, score = node.untried_moves.pop()
+                            new_state = node.state.copy()
+                            new_state.push(chess.Move.from_uci(move_str))
+                            
+                            # El nuevo nodo heredará los parámetros de búsqueda
+                            new_node = MCTSNode(new_state, parent=node, move=move_str, prior_p=score)
+                            node.children.append(new_node)
+                            node = new_node # Evaluamos el nuevo hijo
+                            path.append(node)
+
+            score = self._evaluate_position(node.state)
+            self._backpropagate(node, score)
+        finally:
+            self._remove_vloss(path)
 
     def search(self):
         if not self.root.untried_moves:
@@ -115,16 +196,16 @@ class MCTS:
         # Return the best move after simulations
         #print("Children:", len(self.root.children[0].children))
         #print(self.root.to_json())
-        for c in self.root.children:
-            print(c.move, c.visits, c.value,  c.value / c.visits)
-        return max(self.root.children, key=lambda c: c.visits).move
+        #for c in self.root.children:
+           # print(c.move, c.visits, c.value,  c.value / c.visits)
+        return max(self.root.children, key=lambda c: c.visits).move , [(c.move, c.visits) for c in self.root.children]
 
     def _select(self, node):
         # Traverse down the tree to find a leaf node
         if node.state.is_game_over():
             return node
         while node.is_fully_expanded() and not node.state.is_game_over():
-            node = node.best_child()
+            node = node.best_child(self.puct)
         return node
 
     def _expand(self, node):
@@ -228,39 +309,53 @@ class MCTS:
 
     def _backpropagate(self, node, value):
         while node is not None:
-            node.visits += 1
-            node.value += value
-            value = -value
+            with node.lock: # Bloqueo rápido para evitar condiciones de carrera
+                node.visits += 1
+                node.value += value
+            value = -value # Alternar signo según el turno
             node = node.parent
 
 
 
 
-def mcts_worker(batcher_q, mcts_result_q, worker_response_queue, id, task):
-    print("MCTS worker started", id)
+def mcts_worker(batcher_q, mcts_result_q, worker_response_queue, id, task, puct):
+    n_threads = 4
+    print(f"Worker {id} lanzando {n_threads} hilos...")
 
     local_q = queue.Queue()
-    thread_responses = {t: queue.Queue() for t in range(5)}
+    thread_responses = {}
     SENTINEL = None
     fen = task[1]
     simulations = task[2]
+   
 
-    """def simulation(thread_id):
-        for i in range(simulations):
-            local_q.put((thread_id, fen))  #fen
-            result = thread_responses[thread_id].get()"""
-
-    def get_best_move(board):
+    """def get_best_move(board):
         #print("Best move init:", board.fen())
         # Your CNN function that predicts the best move for the given board
         local_q.put((0, board.fen()))
         response = thread_responses[0].get()
         #print("Best move received:", response)
+        return response"""
+
+    def get_best_move(board):
+        #print(board)
+        t_id = threading.get_ident()
+        
+        # Si el hilo no tiene cola, la crea (sucederá la primera vez que cada hilo pida algo)
+        if t_id not in thread_responses:
+            thread_responses[t_id] = queue.Queue()
+        
+        # Enviamos la petición indicando el ID del hilo
+        local_q.put((t_id, board.fen()))
+        #print((t_id, board.fen()))
+        # Esperamos en la cola específica de este hilo
+        response = thread_responses[t_id].get()
+        #print(response)
         return response
 
 
 
-    print("MCTS worker running simulations...", id)
+    #print("MCTS worker running simulations...", id)
     def sender():
         while True:
             item = local_q.get()
@@ -273,7 +368,7 @@ def mcts_worker(batcher_q, mcts_result_q, worker_response_queue, id, task):
                 print(f"Worker {id} bloqueado: batcher_q está llena")
 
     def receiver():
-        """Escucha respuestas globales y las reparte a los threads locales"""
+        
         while True:
             
             response = worker_response_queue.get()
@@ -286,7 +381,7 @@ def mcts_worker(batcher_q, mcts_result_q, worker_response_queue, id, task):
             if t_id in thread_responses:
                 thread_responses[t_id].put(data)            
 
-    threads = []
+    
 
     sender_thread = threading.Thread(target=sender)
     sender_thread.start()
@@ -294,21 +389,21 @@ def mcts_worker(batcher_q, mcts_result_q, worker_response_queue, id, task):
     receiver_thread.start()
 
 
-    """for t in range(5):
-        th = threading.Thread(target=simulation, args=(t,))
-        th.start()
-        threads.append(th)
-    for th in threads:
-        th.join()"""
-
     board = chess.Board(fen)
-    print("Initial board for MCTS:\n", board)
+    #print("Initial board for MCTS:\n", board)
     #root = MCTSNode(state=board)
-    mcts = MCTS(root_state=board, get_best_function=get_best_move, simulations=simulations)
+    mcts = MCTS(root_state=board, get_best_function=get_best_move, simulations=simulations, puct=puct)
 
-    print("Running MCTS search...")
-    best_move = mcts.search()
-    print("Best move from MCTS:", best_move)
+    with ThreadPoolExecutor(max_workers=n_threads) as executor:
+        # Repartimos las simulaciones totales entre los hilos
+        futures = [executor.submit(mcts.multi_thread_run, simulations // n_threads) 
+                   for _ in range(n_threads)]
+        for f in futures: f.result()
+
+    with mcts.root.lock:
+        best_child = max(mcts.root.children, key=lambda c: c.visits)
+        best_move = best_child.move
+        all_moves = [(str(c.move), c.visits) for c in mcts.root.children]
 
     local_q.put(SENTINEL)
     worker_response_queue.put(SENTINEL)
@@ -317,5 +412,5 @@ def mcts_worker(batcher_q, mcts_result_q, worker_response_queue, id, task):
 
     
         
-    mcts_result_q.put((id, best_move))
+    mcts_result_q.put((id, best_move, all_moves))
     print("MCTS worker finished", id)

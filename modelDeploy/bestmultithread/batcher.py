@@ -2,14 +2,10 @@ import time
 import queue
 
 
-
-avg_batch_size = 0.0
-batch_count = 0
-batch_timeout_counter = 0
-
-
-def batcher_loop(batcher_q, worker_response_queues, inference_q, inference_response_q):
-    global avg_batch_size, batch_count, batch_timeout_counter
+def batcher_loop(batcher_q, worker_response_queues, inference_q, inference_response_q, last_batch_avg):
+    avg_batch_size = 0.0
+    batch_count = 0
+    batch_timeout_counter = 0
     print("Batcher started")
     batch = []
     BATCH_SIZE = 32
@@ -25,9 +21,10 @@ def batcher_loop(batcher_q, worker_response_queues, inference_q, inference_respo
             if not batch:
                 batch_start = time.time()
             batch.append(item)
+            batch_count += 1
+            avg_batch_size += (len(batch) - avg_batch_size) / batch_count
         except queue.Empty:
             pass
-
 
         # Si batch completo
         if len(batch) >= BATCH_SIZE:
@@ -43,14 +40,13 @@ def batcher_loop(batcher_q, worker_response_queues, inference_q, inference_respo
             #last_flush = time.time()
             batch_start = None
             batch_timeout_counter += 1
+        # Estadísticas cada 10 segundos
+        last_batch_avg[0] = avg_batch_size
+        last_batch_avg[1] = batch_timeout_counter
+        last_batch_avg[2] = batch_count
 
 def process_batch(batch, worker_response_queues, inference_q, inference_response_q):
-    #inputs = [x[1] for x in batch]
-    #global avg_batch_size, batch_count, batch_timeout_counter
-    #batch_count += 1
-    #avg_batch_size += (len(batch) - avg_batch_size) / batch_count
-    #print("process batch",batch,len(batch), avg_batch_size, batch_timeout_counter, batch_count)
-    #print("Batcher processing batch of size:", len(batch))
+
     inference_q.put(batch)
 
     predictions = inference_response_q.get()
