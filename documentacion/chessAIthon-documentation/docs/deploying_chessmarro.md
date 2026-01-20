@@ -294,9 +294,9 @@ Reduce inferences and increase selection quality (PUCT).
 
 The strategic formula used is:
 
-[
-PUCT(s,a) = Q(s,a) + c_{puct} \cdot P(s,a)\frac{\sqrt{N(s)}}{1 + N(s,a)}
-]
+
+  PUCT(s,a) = Q(s,a) + c_{puct} \cdot P(s,a)\frac{\sqrt{N(s)}}{1 + N(s,a)}
+
 
 * `Q`: average learned value
 * `P`: network prior (or equivalent heuristic)
