@@ -44,7 +44,7 @@ def task_listener(task_q, mcts_result_q, batcher_q, tasks_result_q, worker_respo
         workers = [
             mp.Process(
                 target=mcts_worker,
-                args=(batcher_q, mcts_result_q, worker_response_queues[i], i, task, 0.01 + (i * (1.39 / (n_workers - 1)))),
+                args=(batcher_q, mcts_result_q, worker_response_queues[i], i, task, 0.5 + (i * (1.89 / (n_workers - 1)))),
             )
             for i in range(n_workers)
         ]
@@ -73,6 +73,14 @@ def task_listener(task_q, mcts_result_q, batcher_q, tasks_result_q, worker_respo
             print(f"Mejor jugada final: {best_move_final} con {total_score} visitas totales")
         else:
             best_move_final = None
+        
+        # imprimir las visitas de la mejor jugada en cada worker
+        for id_worker, best_move_worker, move_counts in sorted(results, key=lambda x: x[0]):
+            # Buscar el move_counts específico para la mejor jugada sugerida por este worker
+            move_visits_from_worker = next((visits for move, visits in move_counts if move == best_move_worker), 0)
+            print(f"Worker {id_worker} sugirió {best_move_worker} con {move_visits_from_worker} visitas en su búsqueda")
+
+
         tasks_result_q.put((task[0], best_move_final, total_visits)) 
         print("Total visits:", total_visits)
         avg, total, todas = last_batch_avg[0], last_batch_avg[1], last_batch_avg[2]

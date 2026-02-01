@@ -60,6 +60,8 @@ By contrast, injecting AI evaluations provides the tree with an initial bias tow
 
 This combination preserves what makes MCTS strong—balanced exploration and exploitation—while dramatically accelerating the learning curve of the tree. Even if the AI is imperfect, a moderately accurate prior reduces variance in the results, improves stability between runs, and allows the search to focus its computational budget on realistic candidates. In practice, this leads to higher playing strength with far fewer simulations than pure random MCTS could ever achieve.
 
+https://lichess.org/analysis/standard/r3k2r/p1qnppbp/2pp2p1/4P3/3P4/2N2Q1P/PP3PP1/R1B1R1K1_b_kq_-_0_13 
+
 
 ## Optimizing MCTS
 

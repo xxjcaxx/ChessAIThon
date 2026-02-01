@@ -43,7 +43,7 @@ class MCTSNode:
         # Determinamos si el jugador en este estado busca maximizar o minimizar
         # Si state.turn == chess.WHITE, significa que el movimiento hacia este nodo lo hizo NEGRO.
         # O más simple: el jugador que va a mover en este nodo es quien decide.
-        is_white_to_move = self.state.turn == chess.WHITE
+        #is_white_to_move = self.state.turn == chess.WHITE
         # Raíz de las visitas totales para el factor de exploración
         sqrt_total_visits = math.sqrt(self.visits + 1)
 
@@ -56,15 +56,19 @@ class MCTSNode:
                 v_loss_penalty = child.vloss * 1.0 # Penalización ajustable
                 # 1. Q: El valor promedio (explotación)
             # Valor relativo: si es turno de negras, el valor se invierte
-                q_value = (child.value - v_loss_penalty) / (child.visits + child.vloss + 1)
+                q_mean = 0
+                if child.visits + child.vloss > 0:
+                    # Penalizamos el valor restando vloss (asumiendo que vloss = derrota)
+                    q_mean = (child.value - child.vloss) / (child.visits + child.vloss)
+                #q_value = (child.value - v_loss_penalty) / (child.visits + child.vloss + 1)
                   # 2. U: El factor de confianza/priors (exploración inteligente)
             # Usamos el prior_p (score de la red)
                 u_value = c_puct * child.prior_p * (sqrt_total_visits / (1 + child.visits + child.vloss))
                 
-            puct_score = q_value + u_value
-            if puct_score > best_value:
-                best_value = puct_score
-                best_node = child
+                puct_score = q_mean + u_value
+                if puct_score > best_value:
+                    best_value = puct_score
+                    best_node = child
 
             
         return best_node
@@ -165,12 +169,15 @@ class MCTS:
                             node = new_node # Evaluamos el nuevo hijo
                             path.append(node)
 
-            score = self._evaluate_position(node.state)
-            self._backpropagate(node, score)
+            #score = self._evaluate_position(node.state)
+            absolute_score = self._evaluate_position(node.state)
+            turn_multiplier = 1 if node.state.turn == chess.WHITE else -1
+            score_relative = absolute_score * turn_multiplier
+            self._backpropagate(node, score_relative)
         finally:
             self._remove_vloss(path)
 
-    def search(self):
+    """def search(self):
         if not self.root.untried_moves:
         # No hay jugadas legales
             return None
@@ -199,7 +206,7 @@ class MCTS:
         #for c in self.root.children:
            # print(c.move, c.visits, c.value,  c.value / c.visits)
         return max(self.root.children, key=lambda c: c.visits).move , [(c.move, c.visits) for c in self.root.children]
-
+"""
     def _select(self, node):
         # Traverse down the tree to find a leaf node
         if node.state.is_game_over():
@@ -308,11 +315,15 @@ class MCTS:
 
 
     def _backpropagate(self, node, value):
+        # value viene desde la perspectiva del jugador en 'node'.
+        # Queremos subir al padre. El padre es el oponente.
+        # Por tanto, el valor para el padre debe ser invertido.
         while node is not None:
-            with node.lock: # Bloqueo rápido para evitar condiciones de carrera
+            with node.lock:
                 node.visits += 1
                 node.value += value
-            value = -value # Alternar signo según el turno
+            
+            value = -value # Invertimos para el siguiente nivel (el padre)
             node = node.parent
 
 
@@ -327,15 +338,7 @@ def mcts_worker(batcher_q, mcts_result_q, worker_response_queue, id, task, puct)
     SENTINEL = None
     fen = task[1]
     simulations = task[2]
-   
 
-    """def get_best_move(board):
-        #print("Best move init:", board.fen())
-        # Your CNN function that predicts the best move for the given board
-        local_q.put((0, board.fen()))
-        response = thread_responses[0].get()
-        #print("Best move received:", response)
-        return response"""
 
     def get_best_move(board):
         #print(board)
