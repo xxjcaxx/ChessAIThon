@@ -156,20 +156,23 @@ class boardComponent extends HTMLElement {
         const makeMove = (move) => {
             const [x, y, X, Y] = uciToMove(move);
             board.movePiece([x, y], [X, Y], 0.3);
-
-            const chess = new Chess(this.state.currentFen.getValue(), { skipValidation: true });
+            const initialFen = this.state.currentFen.getValue();
+            //console.log(initialFen);
+            
+            const chess = new Chess(initialFen, { skipValidation: true });
 
             try {
+                // = chess.fen();
                 chess.move(move, { sloppy: true });
                 const fen = chess.fen();
                 this.state.currentFen.next(fen);
                 this.state.currentBoard.next(setFen(fen));
                 this.state.currentTurn.next(chess.turn());
-                this.state.movesHistory.next([...this.state.movesHistory.getValue(), { fen, move }]);
+                this.state.movesHistory.next([...this.state.movesHistory.getValue(), { fen:initialFen, move }]);
 
                 renderMovesDiv(movesList, fen);
                 const storedBestMoves = loadLocalStorage();
-                storedBestMoves.push({ fen, move });
+                storedBestMoves.push({ fen:initialFen, move });
                 localStorage.setItem('best_moves', JSON.stringify(storedBestMoves));
                 const customEvent = new CustomEvent('makeMove', {
                     bubbles: true,  // para que se propague
