@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- CONFIGURACIÓN ---
-OUTPUT="partida_completa3.txt"
+OUTPUT="partida_completa4.txt"
 # FEN inicial (puedes cambiarlo por 'startpos' o cualquier FEN)
 FEN_INICIAL=${1:-"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"}
 current_fen="$FEN_INICIAL"
@@ -35,7 +35,7 @@ do
     echo "MCTS output for turn %d: %s\n" "$i" "$mcts_move"
     mcts_move4000=$(curl -s -X POST "http://127.0.0.1:8000/predict" \
         -H "Content-Type: application/json" \
-        -d "{\"fen\": \"$current_fen\", \"simulations\": 40000}" \
+        -d "{\"fen\": \"$current_fen\", \"simulations\": 4000}" \
         | jq -r '.move')
     echo "MCTS output for turn %d: %s\n" "$i" "$mcts_move4000"
     # 3. Guardar el estado actual antes de mover

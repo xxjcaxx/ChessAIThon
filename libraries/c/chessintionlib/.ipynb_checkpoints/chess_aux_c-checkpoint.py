@@ -74,43 +74,4 @@ def concat_fen_legal_ptr(fen):
     
     # Llamar a la función de la librería compartida
     return chess_extension.concat_fen_legal_bits(fen_bytes)
-
-def normalize_perspective(fen, move_uci):
-    """
-    Normaliza el FEN y el movimiento si el turno es de las negras.
-    """
-    board = chess.Board(fen)
-    if board.turn == chess.BLACK:
-        # Voltear tablero
-        flipped_board = board.mirror()
-        # Voltear movimiento
-        move = chess.Move.from_uci(move_uci)
-        flipped_move = chess.Move(
-            chess.square_mirror(move.from_square),
-            chess.square_mirror(move.to_square),
-            promotion=move.promotion
-        )
-        return flipped_board.fen(), flipped_move.uci()
-    return fen, move_uci
-
-
-def translate_move_to_real(network_move_uci, is_black):
-    """
-    Traduce el movimiento de la red al tablero real.
-    Si es el turno de las negras, voltea las coordenadas.
-    """
-    if not is_black:
-        return network_move_uci  # Si son blancas, el movimiento ya es real
-
-    # Crear objeto move desde el UCI de la red (ej: 'e2e4')
-    move = chess.Move.from_uci(network_move_uci)
     
-    # Aplicar mirror a las casillas origen y destino
-    # square_mirror convierte fila 1 en 8, 2 en 7, etc.
-    real_move = chess.Move(
-        chess.square_mirror(move.from_square),
-        chess.square_mirror(move.to_square),
-        promotion=move.promotion
-    )
-    
-    return real_move.uci()

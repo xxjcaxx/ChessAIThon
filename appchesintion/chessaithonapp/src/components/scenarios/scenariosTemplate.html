@@ -1,4 +1,4 @@
-<div  class="has-background-dark has-text-white main-content container is-fluid columns p-6 is-desktop">
+<div class="has-background-dark has-text-white main-content container is-fluid columns p-6 is-desktop">
     <div id="representation" class="column pt-6">
         <h2 class="title is-2 has-text-white">Play a Scenario</h2>
         <div class="" id="boardContainer">
@@ -9,16 +9,7 @@
     <div id="scenariosList" class="column pt-6">
 
         <h2 class="title is-2 has-text-white">Scenarios Management</h2>
-        <p>
-            Here you can upload your own CSV/FEN files with chess scenarios.
-            When you choose and resolve a scenario it will be stored in your
-            browser. You can see and change your solution.
-            <br>
-            When you finish, you can export scenarios and solutions in CSV in order
-            to train your AI model.
-            <br>
-            You can also load our default scenarios or provide a url for scenarios online.
-        </p>
+
         <br>
         <div class="field is-horizontal">
             <div class="field-body">
@@ -28,12 +19,12 @@
                 <div class="field">
                     <div class="file has-name is-small ">
                         <label class="file-label is-small ">
-                            <input class="file-input is-small " type="file" name="resume" />
+                            <input class="file-input is-small" id="fileInput" type="file" name="resume" />
                             <span class="file-cta ">
                                 <span class="file-icon ">
                                     <i class="fas fa-upload"></i>
                                 </span>
-                                <span class="file-label "> Choose a file… </span>
+                                <span class="file-label"> Choose a file… </span>
                             </span>
                             <span class="file-name"> chess_scenarios.csv </span>
                         </label>
@@ -44,10 +35,10 @@
                 <div class="field">
                     <div class="field has-addons is-small">
                         <div class="control">
-                            <input class="input is-small" type="text" placeholder="Link to csv">
+                            <input id="linktocsv" class="input is-small" type="text" placeholder="Link to csv">
                         </div>
                         <div class="control">
-                            <button class="button  is-small">
+                            <button class="button  is-small" id="buttonLink">
                                 Load
                             </button>
                         </div>
@@ -56,34 +47,64 @@
 
             </div>
         </div>
-        Your Scenarios:
-        <div id="storedScenarios" class="scenariosListDiv"></div>
-        Loaded Scenarios:
-        <div id="loadedScenarios" class="scenariosListDiv"></div>
+        <div class="box">
+            <div class="level is-mobile mb-3">
+                <div class="level-left">
+                    <h3 class="title is-5 mb-0">Your Scenarios</h3>
+                </div>
+                <div class="level-right">
+                    <button class="button is-primary is-small" id="saveCSVButton">Download</button>
+                </div>
+            </div>
+            <div id="storedScenarios" class="scenariosListDiv">
+            </div>
+        </div>
+        <br>
+                <div class="box">
+            <div class="level is-mobile mb-3">
+                <div class="level-left">
+                    <h3 class="title is-5 mb-0"> Loaded Scenarios:</h3>
+                </div>
+                
+            </div>
+            <div id="loadedScenarios" class="scenariosListDiv">
+            </div>
+        </div>
+    
+        <p>
+            Here you can upload your own CSV/FEN files with chess scenarios.
+            When you choose and resolve a scenario it will be stored in your
+            browser. You can see and change your solution.
+            <br>
+            When you finish, you can export scenarios and solutions in CSV in order
+            to train your AI model.
+            <br>
+            You can also load our default scenarios or provide a url for scenarios online.
+            <br>
+            You have to choose the best move in your opinion. You can change it if you want. You have to choose also the
+            "value" of the move. Value is the expected provability to win the game in the scenario after the move. Value
+            must be between -1 and 1. From i'm sure to loose or i'm sure to win. O is a draw.
+
+        </p>
     </div>
 </div>
 
 
 
-
-
-
-
-
-
-
-
-
 <template id="scenariosListTable">
-    <table class="table is-striped is-hoverable is-fullwidth">
-        <thead>
-            <tr>
-                <th>Choose a Scenario</th><th>Best Move</th><th></th>
-            </tr>
-        </thead>
-        <tbody>
+    <div class="table-container">
+        <table class="table is-striped is-hoverable is-fullwidth is-narrow is-size-7 is-nowrap">
+            <thead>
+                <tr>
+                    <th class="is-narrow">Choose a Scenario</th>
+                    <th class="is-narrow">Best Move</th>
+                    <th class="is-narrow">Value</th>
+                    <th class="is-narrow"></th>
+                </tr>
+            </thead>
+            <tbody>
 
-        </tbody>
-    </table>
+            </tbody>
+        </table>
+    </div>
 </template>
-
