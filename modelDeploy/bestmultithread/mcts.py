@@ -8,6 +8,7 @@ import math
 import json
 from concurrent.futures import ThreadPoolExecutor
 import numpy as np
+import gc
 
 def normalize_moves(moves):
     total = sum(score for _, score in moves)
@@ -30,7 +31,7 @@ def filter_by_cumulative_probability(moves, threshold=0.80, min_k=3):
             
     return normalize_moves(filtered)
 
-def apply_dirichlet_noise(moves_with_scores, epsilon=0.25, alpha=0.3):
+def apply_dirichlet_noise(moves_with_scores, epsilon=0.35, alpha=0.2):
     if not moves_with_scores:
         return []
     
@@ -133,24 +134,12 @@ class MCTS:
         # Si el valor es relativo al que mueve, lo dejamos tal cual
         root_nn_value = prediction['value']
         
-        #print(f"Evaluación inicial de la red: {root_nn_value:.3f}")
-        print(f"Evaluación inicial de la red: {root_nn_value:.3f}",f" Mejor jugada inicial: {moves_with_noise}")
+        #print(f"Evaluación inicial de la red:  {moves_with_noise[0][0]} {root_nn_value:.3f}")
+        #print(f"Evaluación inicial de la red: {root_nn_value:.3f}",f" Mejor jugada inicial: {moves_with_noise}")
 
         # 4. Creamos la raíz e inyectamos el valor inicial
         self.root = MCTSNode(root_state, priority_moves=moves_with_noise)
-        #self.root.value = root_nn_value # Inyectamos la "intuición" de la red
-        #self.root.visits = 1           # Para que el promedio sea el root_nn_value
-
-        # 5. Expandimos la raíz inmediatamente
-        """for move_str, score in moves_with_scores:
-            new_state = root_state.copy()
-            new_state.push(chess.Move.from_uci(move_str))
-            child_node = MCTSNode(new_state, parent=self.root, move=move_str, prior_p=score)
-            self.root.children.append(child_node)
-
-        # Cerramos untried_moves para que is_fully_expanded() sea True
-        self.root.untried_moves = []"""
-
+       
         self.get_best_function = get_best_function
         self.simulations = simulations
         self.puct = puct
@@ -291,16 +280,17 @@ class MCTS:
 
 
 
-
-def mcts_worker(batcher_q, mcts_result_q, worker_response_queue, id, task, puct):
+def mcts_worker_persistent(batcher_q, mcts_result_q, worker_response_queue, task_in_q, id, puct):
     n_threads = 4
-    print(f"Worker {id} lanzando {n_threads} hilos... {task[2]} simulaciones")
+    
 
     local_q = queue.Queue()
-    thread_responses = {}
+   ## thread_responses = {}
+    thread_responses = {i: queue.Queue() for i in range(1000)} # Diccionario pre-asignado o gestión fija
+    # Nota: threading.get_ident() puede dar IDs muy altos, mejor mapear t_id a un índice 0..n_threads
     SENTINEL = None
-    fen = task[1]
-    simulations = task[2]
+    executor = ThreadPoolExecutor(max_workers=n_threads)
+   
 
 
     def mirror_uci_move(uci_str):
@@ -357,55 +347,83 @@ def mcts_worker(batcher_q, mcts_result_q, worker_response_queue, id, task, puct)
                 print(f"Worker {id} bloqueado: batcher_q está llena")
 
     def receiver():
-        
         while True:
             
             response = worker_response_queue.get()
             #print("MCTS worker"+str(id)+" received response:", response)
             if response is SENTINEL: break
-            
+
             identificadores, data = response
             t_id = identificadores[1][0]  # Extraemos el id del thread
             # Entregamos el resultado al thread que lo pidió
             if t_id in thread_responses:
                 thread_responses[t_id].put(data)            
 
-    
 
     sender_thread = threading.Thread(target=sender)
     sender_thread.start()
     receiver_thread = threading.Thread(target=receiver)
     receiver_thread.start()
 
+    try:
+        while True:
 
-    board = chess.Board(fen)
-    #print("Initial board for MCTS:\n", board)
-    #root = MCTSNode(state=board)
-    mcts = MCTS(root_state=board, get_best_function=get_best_move, simulations=simulations, puct=puct)
+            task = task_in_q.get() # Espera a que llegue el FEN
+            if task is None: 
+                break # Señal de apagado
 
-    with ThreadPoolExecutor(max_workers=n_threads) as executor:
-        # Repartimos las simulaciones totales entre los hilos
-        sims_per_thread = simulations // n_threads
-        futures = [executor.submit(mcts.multi_thread_run, sims_per_thread) 
-                        for _ in range(n_threads)]
-        results = [f.result() for f in futures]
+            thread_responses.clear()
 
-    worker_max_depth = max(r[0] for r in results)
-    worker_avg_depth = sum(r[1] for r in results) / len(results)
+            #print(f"Worker {id} lanzando {n_threads} hilos... {task[2]} simulaciones")
 
-    print(f"Worker {id} [PUCT {puct:.1f}]: Max Depth: {worker_max_depth}, Avg Depth: {worker_avg_depth:.2f}")
+            fen = task[1]
+            simulations = task[2]
 
-    with mcts.root.lock:
-        best_child = max(mcts.root.children, key=lambda c: c.visits)
-        best_move = best_child.move
-        all_moves = [(str(c.move), c.visits) for c in mcts.root.children]
+            board = chess.Board(fen)
+            #print("Initial board for MCTS:\n", board)
+            #root = MCTSNode(state=board)
+            mcts = MCTS(root_state=board, get_best_function=get_best_move, simulations=simulations, puct=puct)
 
-    local_q.put(SENTINEL)
-    worker_response_queue.put(SENTINEL)
+            #with ThreadPoolExecutor(max_workers=n_threads) as executor:
+                # Repartimos las simulaciones totales entre los hilos
+            sims_per_thread = simulations // n_threads
+            futures = [executor.submit(mcts.multi_thread_run, sims_per_thread) 
+                                for _ in range(n_threads)]
+            results = [f.result() for f in futures]
+
+            worker_max_depth = max(r[0] for r in results)
+            worker_avg_depth = sum(r[1] for r in results) / len(results)
+
+            #print(f"Worker {id} [PUCT {puct:.1f}]: Max Depth: {worker_max_depth}, Avg Depth: {worker_avg_depth:.2f}")
+
+            with mcts.root.lock:
+                best_child = max(mcts.root.children, key=lambda c: c.visits)
+                best_move = best_child.move
+                all_moves = [(str(c.move), c.visits) for c in mcts.root.children]
+
+            #local_q.put(SENTINEL)
+            #worker_response_queue.put(SENTINEL)
+                
+            mcts_result_q.put((id, best_move, all_moves))
+            #print("MCTS worker finished", id)
+            thread_responses.clear()
+            def clear_tree(node):
+                for child in node.children:
+                    clear_tree(child)
+                node.children = []
+                node.parent = None  # Rompemos la referencia circular
+
+            clear_tree(mcts.root)
+            
+            del mcts
+            del board
+            gc.collect()
+    finally:
+        executor.shutdown(wait=False)
+        # Enviar sentinels para cerrar sender/receiver
+        local_q.put(None)
+
     sender_thread.join()
     receiver_thread.join()
 
     
-        
-    mcts_result_q.put((id, best_move, all_moves))
-    #print("MCTS worker finished", id)

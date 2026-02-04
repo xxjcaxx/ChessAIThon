@@ -18,10 +18,10 @@ def create_api(task_q, tasks_result_q):
         task_q.put((task_id, req.fen, req.simulations))
 
         while True:
-            rid, move, total_visits = tasks_result_q.get()
+            rid, move, total_visits, alternatives = tasks_result_q.get()
             print("Checking result:", rid, move)
             
             if rid == task_id:
-                return {"move": move}
+                return {"move": move, "visits": total_visits, "alternatives": alternatives}
 
     return app

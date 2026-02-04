@@ -7,7 +7,7 @@ from .api import create_api
 from .inference_server import inference_server
 from chessmodel import init_model
 from .batcher import batcher_loop
-from .mcts import mcts_worker
+from .mcts import  mcts_worker_persistent
 import queue
 from collections import Counter
 #from mcts_worker import mcts_worker
@@ -34,28 +34,32 @@ def get_model():
 
 
 
-
 def task_listener(task_q, mcts_result_q, batcher_q, tasks_result_q, worker_response_queues, last_batch_avg):
     print("Task listener started")
-    n_workers = mp.cpu_count()
+    n_workers = (mp.cpu_count() // 2 ) +  (mp.cpu_count() // 3 )
+
+    worker_task_in_queues = [mp.Queue(maxsize=1) for _ in range(n_workers)]
+    # Lanzamos los workers UNA SOLA VEZ
+    for i in range(n_workers):
+        p = mp.Process(
+            target=mcts_worker_persistent, # Nueva función
+            args=(batcher_q, mcts_result_q, worker_response_queues[i], worker_task_in_queues[i], i, 0.5 + (i * (1.89 / (n_workers - 1))))
+        )
+        p.daemon = True
+        p.start()
+
     while True:
         task = task_q.get()
         print("Task listener received task:", task)
-        workers = [
-            mp.Process(
-                target=mcts_worker,
-                args=(batcher_q, mcts_result_q, worker_response_queues[i], i, task, 0.5 + (i * (1.89 / (n_workers - 1)))),
-            )
-            for i in range(n_workers)
-        ]
-        for w in workers:
-            w.start()
-        for w in workers:
-            w.join()
+
+        for q in worker_task_in_queues:
+            q.put(task)
+
+        results = [mcts_result_q.get() for _ in range(n_workers)]
 
         print("All MCTS workers finished for task:", task)
         # Mock result after all workers are done
-        results = [mcts_result_q.get() for _ in range(n_workers)]
+        #results = [mcts_result_q.get() for _ in range(n_workers)]
         #print("MCTS results collected:", results)
         # 1. Acumular todas las visitas en un contador global
         total_visits = Counter()
@@ -67,25 +71,35 @@ def task_listener(task_q, mcts_result_q, batcher_q, tasks_result_q, worker_respo
 
         # 2. Determinar la jugada ganadora (la que tiene más visitas totales)
         if total_visits:
-            best_move_final = max(total_visits, key=total_visits.get)
-            total_score = total_visits[best_move_final]
-            
-            print(f"Mejor jugada final: {best_move_final} con {total_score} visitas totales")
+            top_moves = total_visits.most_common(6)
+            best_move_final = top_moves[0][0]  # El string de la jugada (ej: 'e2e4')
+            total_score_final = top_moves[0][1] # Las visitas totales de esa jugada
+
+
+            alternatives = top_moves[1:]
+            print(f"Alternativas encontradas: {len(alternatives)}")
+            print(f"Mejor jugada final: {best_move_final} con {total_score_final} visitas totales")
         else:
             best_move_final = None
+            total_score_final = 0
+            alternatives = []
         
         # imprimir las visitas de la mejor jugada en cada worker
-        for id_worker, best_move_worker, move_counts in sorted(results, key=lambda x: x[0]):
-            # Buscar el move_counts específico para la mejor jugada sugerida por este worker
-            move_visits_from_worker = next((visits for move, visits in move_counts if move == best_move_worker), 0)
-            print(f"Worker {id_worker} sugirió {best_move_worker} con {move_visits_from_worker} visitas en su búsqueda")
+        # Formateamos los resultados de cada worker en una lista de strings cortos
+        worker_info = [
+            f"W{idw}:{mv}({next((v for m, v in cnts if m == mv), 0)})" 
+            for idw, mv, cnts in sorted(results, key=lambda x: x[0])
+        ]
+        
+        # Imprimimos todo en una sola línea separada por pipes
+        print(f" -> Detalle Workers: {' | '.join(worker_info)}")
 
 
-        tasks_result_q.put((task[0], best_move_final, total_visits)) 
-        print("Total visits:", total_visits)
+        tasks_result_q.put((task[0], best_move_final, total_score_final, alternatives)) 
+        #print("Total visits:", total_visits)
         avg, total, todas = last_batch_avg[0], last_batch_avg[1], last_batch_avg[2]
         print(f"Media: {avg}, Incompletos: {total}, Todos los batches: {todas}")
-    print("Task listener finished")    
+    print("Task listener finished")  
 
 def main():
     print("Main process started")

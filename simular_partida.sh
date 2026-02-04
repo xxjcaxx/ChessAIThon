@@ -29,14 +29,14 @@ do
 
     # 2. Obtener la opinión de tu API (MCTS) para ese mismo FEN
     mcts_move=$(curl -s -X POST "http://127.0.0.1:8000/predict" \
-        -H "Content-Type: application/json" \
-        -d "{\"fen\": \"$current_fen\", \"simulations\": 200}" \
-        | jq -r '.move')
+    -H "Content-Type: application/json" \
+    -d "{\"fen\": \"$current_fen\", \"simulations\": 200}" \
+    | jq -r '[.move, (.alternatives[] | .[0])] | join(",")')
     echo "MCTS output for turn %d: %s\n" "$i" "$mcts_move"
     mcts_move4000=$(curl -s -X POST "http://127.0.0.1:8000/predict" \
-        -H "Content-Type: application/json" \
-        -d "{\"fen\": \"$current_fen\", \"simulations\": 4000}" \
-        | jq -r '.move')
+    -H "Content-Type: application/json" \
+    -d "{\"fen\": \"$current_fen\", \"simulations\": 4000}" \
+    | jq -r '[.move, (.alternatives[] | .[0])] | join(",")')
     echo "MCTS output for turn %d: %s\n" "$i" "$mcts_move4000"
     # 3. Guardar el estado actual antes de mover
     echo -e "$i\t$current_fen\t$sf_move\t$mcts_move\t$mcts_move4000" >> "$OUTPUT"

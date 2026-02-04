@@ -8,7 +8,7 @@ def batcher_loop(batcher_q, worker_response_queues, inference_q, inference_respo
     batch_timeout_counter = 0
     print("Batcher started")
     batch = []
-    BATCH_SIZE = 64
+    BATCH_SIZE = 32
     GET_TIMEOUT = 0.005 
     batch_start = None 
     TIMEOUT = 0.02  # 20 ms
