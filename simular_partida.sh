@@ -3,7 +3,7 @@
 # --- CONFIGURACIÓN ---
 OUTPUT="partida_completa4.txt"
 # FEN inicial (puedes cambiarlo por 'startpos' o cualquier FEN)
-FEN_INICIAL=${1:-"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"}
+FEN_INICIAL=${1:-"r1bqk2r/pppp1ppp/2n2n2/2b1p3/2BPP3/2P2N2/PP3PPP/RNBQK2R b KQkq - 0 5"}
 current_fen="$FEN_INICIAL"
 MAX_MOVES=100  # Límite para evitar partidas infinitas
 
@@ -35,7 +35,7 @@ do
     echo "MCTS output for turn %d: %s\n" "$i" "$mcts_move"
     mcts_move4000=$(curl -s -X POST "http://127.0.0.1:8000/predict" \
     -H "Content-Type: application/json" \
-    -d "{\"fen\": \"$current_fen\", \"simulations\": 4000}" \
+    -d "{\"fen\": \"$current_fen\", \"simulations\": 400}" \
     | jq -r '[.move, (.alternatives[] | .[0])] | join(",")')
     echo "MCTS output for turn %d: %s\n" "$i" "$mcts_move4000"
     # 3. Guardar el estado actual antes de mover

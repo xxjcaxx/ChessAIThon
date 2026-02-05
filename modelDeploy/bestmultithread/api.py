@@ -13,14 +13,15 @@ def create_api(task_q, tasks_result_q):
 
     @app.post("/predict")
     def predict(req: Req):
-        print("Received request:", req)
+        print("\033[1;36m♟️  Request received\033[0m | sims="+str(req.simulations)+"")
+        print("\033[36mFEN:\033[0m "+str(req.fen)+"\n")
+
         task_id = uuid.uuid4().hex
         task_q.put((task_id, req.fen, req.simulations))
 
         while True:
             rid, move, total_visits, alternatives = tasks_result_q.get()
-            print("Checking result:", rid, move)
-            
+           
             if rid == task_id:
                 return {"move": move, "visits": total_visits, "alternatives": alternatives}
 

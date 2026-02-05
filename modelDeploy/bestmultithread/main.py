@@ -10,6 +10,10 @@ from .batcher import batcher_loop
 from .mcts import  mcts_worker_persistent
 import queue
 from collections import Counter
+import os
+import psutil
+import time
+import chess
 #from mcts_worker import mcts_worker
 #from gradio_app import launch_gradio
 
@@ -37,7 +41,9 @@ def get_model():
 def task_listener(task_q, mcts_result_q, batcher_q, tasks_result_q, worker_response_queues, last_batch_avg):
     print("Task listener started")
     n_workers = (mp.cpu_count() // 2 ) +  (mp.cpu_count() // 3 )
+    print("\033[1;36m👷 Workers:\033[0m", n_workers)
 
+    #print("Task listener started", n_workers, "MCTS workers will be launched")
     worker_task_in_queues = [mp.Queue(maxsize=1) for _ in range(n_workers)]
     # Lanzamos los workers UNA SOLA VEZ
     for i in range(n_workers):
@@ -50,14 +56,16 @@ def task_listener(task_q, mcts_result_q, batcher_q, tasks_result_q, worker_respo
 
     while True:
         task = task_q.get()
-        print("Task listener received task:", task)
-
+        #print("Task listener received task:", task)
+        board_demo = chess.Board(task[1])
+        print(board_demo.unicode().replace("⭘", "·"))
+        start = time.perf_counter()
         for q in worker_task_in_queues:
             q.put(task)
 
         results = [mcts_result_q.get() for _ in range(n_workers)]
 
-        print("All MCTS workers finished for task:", task)
+        #print("All MCTS workers finished for task:", task)
         # Mock result after all workers are done
         #results = [mcts_result_q.get() for _ in range(n_workers)]
         #print("MCTS results collected:", results)
@@ -77,8 +85,9 @@ def task_listener(task_q, mcts_result_q, batcher_q, tasks_result_q, worker_respo
 
 
             alternatives = top_moves[1:]
-            print(f"Alternativas encontradas: {len(alternatives)}")
-            print(f"Mejor jugada final: {best_move_final} con {total_score_final} visitas totales")
+            #print(f"Alternativas encontradas: {len(alternatives)}")
+            print(f"\033[1;32m🏆 Best move:\033[0m {best_move_final}  \033[1;33m({total_score_final} visits)\033[0m\n")
+            #print(f"Mejor jugada final: {best_move_final} con {total_score_final} visitas totales")
         else:
             best_move_final = None
             total_score_final = 0
@@ -92,13 +101,22 @@ def task_listener(task_q, mcts_result_q, batcher_q, tasks_result_q, worker_respo
         ]
         
         # Imprimimos todo en una sola línea separada por pipes
-        print(f" -> Detalle Workers: {' | '.join(worker_info)}")
+        print(f"-> Workers detail: {' | '.join(worker_info)}\n")
 
 
         tasks_result_q.put((task[0], best_move_final, total_score_final, alternatives)) 
         #print("Total visits:", total_visits)
         avg, total, todas = last_batch_avg[0], last_batch_avg[1], last_batch_avg[2]
-        print(f"Media: {avg}, Incompletos: {total}, Todos los batches: {todas}")
+        #print(f"Media: {avg}, Incompletos: {total}, Todos los batches: {todas}")
+        print(
+            f"\033[1;35m📊 Batcher:\033[0m "
+            f"\033[34mavg={avg}\033[0m | "
+            f"\033[33mincomplete={total}\033[0m | "
+            f"\033[32mtotal={todas}\033[0m"
+        )
+        end = time.perf_counter()
+        #print(f"Tiempo total para procesar la tarea: {end - start:.2f} segundos")
+        print(f"\033[1;32m🚀 Processing time:\033[0m {end - start:.2f}  s\n")
     print("Task listener finished")  
 
 def main():

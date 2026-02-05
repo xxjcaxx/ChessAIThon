@@ -49,8 +49,8 @@ def concat_fen_legal(fen):
     # Call concat_fen_legal from the shared library
     result_ptr = chess_extension.concat_fen_legal(fen_bytes)
 
-    compressed_tensor = torch.tensor(list(result_ptr.contents), dtype=torch.uint8, device="cuda")
-    bit_tensor = ((compressed_tensor[:, None] >> torch.arange(8, device="cuda")) & 1).to(torch.float32)
+    compressed_tensor = torch.tensor(list(result_ptr.contents), dtype=torch.uint8, device="cpu")
+    bit_tensor = ((compressed_tensor[:, None] >> torch.arange(8, device="cpu")) & 1).to(torch.float32)
     bit_tensor = bit_tensor.view(77, 8, 8)
     return bit_tensor
 

@@ -9,6 +9,10 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 import gc
+import os
+import psutil
+from chess_aux import uci_to_number, number_to_uci, concat_fen_legal, concat_fen_legal_packed
+import torch
 
 def normalize_moves(moves):
     total = sum(score for _, score in moves)
@@ -132,7 +136,7 @@ class MCTS:
         
         # 3. Extraemos el valor de la red
         # Si el valor es relativo al que mueve, lo dejamos tal cual
-        root_nn_value = prediction['value']
+        rchaoot_nn_value = prediction['value']
         
         #print(f"Evaluación inicial de la red:  {moves_with_noise[0][0]} {root_nn_value:.3f}")
         #print(f"Evaluación inicial de la red: {root_nn_value:.3f}",f" Mejor jugada inicial: {moves_with_noise}")
@@ -281,7 +285,7 @@ class MCTS:
 
 
 def mcts_worker_persistent(batcher_q, mcts_result_q, worker_response_queue, task_in_q, id, puct):
-    n_threads = 4
+    n_threads = 8
     
 
     local_q = queue.Queue()
@@ -341,8 +345,13 @@ def mcts_worker_persistent(batcher_q, mcts_result_q, worker_response_queue, task
             if item is SENTINEL:
                 break
             try:
-                #print("Worker", id, "sending item to batcher:", item)
-                batcher_q.put((id, item), timeout=1.0)
+               # print("Worker", id, "sending item to batcher:", item)
+                #item_tensor = concat_fen_legal_packed(item[1]) 
+                item_tensor = concat_fen_legal(item[1])
+                #print("Worker", id, "sending item to batcher:", item_tensor.shape, item_tensor.dtype)
+                batcher_q.put((id, (item[0], item_tensor)), timeout=1.0)
+                #batcher_q.put((id, item), timeout=1.0)
+    
             except queue.Full:
                 print(f"Worker {id} bloqueado: batcher_q está llena")
 
@@ -418,6 +427,13 @@ def mcts_worker_persistent(batcher_q, mcts_result_q, worker_response_queue, task
             del mcts
             del board
             gc.collect()
+
+            """def get_process_memory():
+                process = psutil.Process(os.getpid())
+                mem_info = process.memory_info()
+                return mem_info.rss / (1024 ** 2)  # Convertir a MB
+
+            print(f"Consumo del proceso actual: {get_process_memory():.2f} MB")"""
     finally:
         executor.shutdown(wait=False)
         # Enviar sentinels para cerrar sender/receiver
