@@ -110,14 +110,6 @@ def concat_fen_legal(fen):
     return fen_matrix_legal_moves
 
 
-def concat_fen_legal_packed(fen):
-    board = chess.Board(fen)
-    fen_matrix = board2rep(board)
-    legal_moves = legal_moves_to_64_8_8(board)
-    fen_matrix_legal_moves = np.concatenate((fen_matrix,legal_moves),0)
-    return np.packbits(fen_matrix_legal_moves)
-
-
 
 
 

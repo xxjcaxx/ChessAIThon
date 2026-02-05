@@ -71,39 +71,52 @@ def task_listener(task_q, mcts_result_q, batcher_q, tasks_result_q, worker_respo
         #print("MCTS results collected:", results)
         # 1. Acumular todas las visitas en un contador global
         total_visits = Counter()
+        first_worker_initial_moves = results[0][3] if results else []
 
-        for id_worker, best_move_worker, move_counts in results:
-            # move_counts es la lista de tuplas [('f7f5', 3), ('c8h3', 1), ...]
+        for _, _, move_counts, _ in results:
             for move, visits in move_counts:
                 total_visits[move] += visits
 
         # 2. Determinar la jugada ganadora (la que tiene más visitas totales)
         if total_visits:
-            top_moves = total_visits.most_common(6)
-            best_move_final = top_moves[0][0]  # El string de la jugada (ej: 'e2e4')
-            total_score_final = top_moves[0][1] # Las visitas totales de esa jugada
-
-
+            # 2. Determinar la jugada ganadora real
+            top_moves = total_visits.most_common(7) 
+            best_move_final = top_moves[0][0]  
+            total_score_final = top_moves[0][1] 
+            
+            # Alternatives son las siguientes mejores jugadas
             alternatives = top_moves[1:]
-            #print(f"Alternativas encontradas: {len(alternatives)}")
-            print(f"\033[1;32m🏆 Best move:\033[0m {best_move_final}  \033[1;33m({total_score_final} visits)\033[0m\n")
-            #print(f"Mejor jugada final: {best_move_final} con {total_score_final} visitas totales")
-        else:
-            best_move_final = None
-            total_score_final = 0
-            alternatives = []
-        
-        # imprimir las visitas de la mejor jugada en cada worker
-        # Formateamos los resultados de cada worker en una lista de strings cortos
-        worker_info = [
-            f"W{idw}:{mv}({next((v for m, v in cnts if m == mv), 0)})" 
-            for idw, mv, cnts in sorted(results, key=lambda x: x[0])
-        ]
-        
-        # Imprimimos todo en una sola línea separada por pipes
-        print(f"-> Workers detail: {' | '.join(worker_info)}\n")
 
+            # 3. Imprimir Best Move
+            print(f"\033[1;32m🏆 Best move:\033[0m {best_move_final}  \033[1;33m({total_score_final} visits)\033[0m")
 
+            # 4. Imprimir Initial Moves (usando la referencia del primer worker)
+            if first_worker_initial_moves:
+                sorted_initial = sorted(first_worker_initial_moves, key=lambda x: x[1], reverse=True)
+                formatted_initial = []
+                for move, prob in sorted_initial:
+                    color = "\033[1;32m" if prob > 0.5 else "\033[1;36m" if prob > 0.2 else "\033[0;90m"
+                    formatted_initial.append(f"{move} {color}({prob:.3f})\033[0m")
+                print(f"Red's Intuition: {' | '.join(formatted_initial)}")
+
+            # 5. Imprimir Alternatives (Visitas)
+            if alternatives:
+                max_v = max(v for _, v in alternatives)
+                formatted_alts = []
+                for move, visits in alternatives:
+                    ratio = visits / max_v
+                    color = "\033[1;32m" if ratio > 0.8 else "\033[1;36m" if ratio > 0.4 else "\033[0;34m"
+                    formatted_alts.append(f"{move} {color}[{visits}v]\033[0m")
+                print(f"Other explored: {' ⮕  '.join(formatted_alts)}")
+
+            # --- CORRECCIÓN DE LA ALERTA ---
+            # Comparamos el top 1 de la red vs el top 1 del MCTS
+            best_initial_move = max(first_worker_initial_moves, key=lambda x: x[1])[0] if first_worker_initial_moves else None
+            
+            if best_initial_move and best_initial_move != best_move_final:
+                print(f"\033[1;43;30m ⚠️  MCTS CORRECTION \033[0m Red preferred \033[1;31m{best_initial_move}\033[0m but Search chose \033[1;32m{best_move_final}\033[0m")
+                print("\033[1;33m" + "━" * 65 + "\033[0m")
+                
         tasks_result_q.put((task[0], best_move_final, total_score_final, alternatives)) 
         #print("Total visits:", total_visits)
         avg, total, todas = last_batch_avg[0], last_batch_avg[1], last_batch_avg[2]

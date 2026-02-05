@@ -11,7 +11,7 @@ import numpy as np
 import gc
 import os
 import psutil
-from chess_aux import uci_to_number, number_to_uci, concat_fen_legal, concat_fen_legal_packed
+from chess_aux_optim import  concat_fen_legal
 import torch
 
 def normalize_moves(moves):
@@ -134,6 +134,10 @@ class MCTS:
         # 2. Inyectamos Ruido (SOLO en la raíz)
         moves_with_noise = apply_dirichlet_noise(moves_with_scores)
         
+        self.initial_moves = list(prediction['moves'])  # Guardamos esto para análisis o visualización futura
+        
+        
+
         # 3. Extraemos el valor de la red
         # Si el valor es relativo al que mueve, lo dejamos tal cual
         rchaoot_nn_value = prediction['value']
@@ -404,16 +408,20 @@ def mcts_worker_persistent(batcher_q, mcts_result_q, worker_response_queue, task
             worker_avg_depth = sum(r[1] for r in results) / len(results)
 
             #print(f"Worker {id} [PUCT {puct:.1f}]: Max Depth: {worker_max_depth}, Avg Depth: {worker_avg_depth:.2f}")
+            
 
             with mcts.root.lock:
                 best_child = max(mcts.root.children, key=lambda c: c.visits)
                 best_move = best_child.move
                 all_moves = [(str(c.move), c.visits) for c in mcts.root.children]
+                ###########################3
+                initial_moves = mcts.initial_moves  # Movimientos iniciales con ruido y filtrados
+                #print(f"Worker {id} initial moves: {initial_moves}")
 
             #local_q.put(SENTINEL)
             #worker_response_queue.put(SENTINEL)
                 
-            mcts_result_q.put((id, best_move, all_moves))
+            mcts_result_q.put((id, best_move, all_moves, initial_moves))
             #print("MCTS worker finished", id)
             thread_responses.clear()
             def clear_tree(node):

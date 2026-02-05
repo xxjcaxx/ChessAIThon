@@ -9,7 +9,7 @@ def batcher_loop(batcher_q, worker_response_queues,
 
     print("Batcher started")
 
-    BATCH_SIZE = 50
+    BATCH_SIZE = 64
     TIMEOUT = 0.04  # 40 ms
 
     avg_batch_size = 0.0

@@ -8,60 +8,7 @@ import os
 import psutil
 import numpy as np
 
-"""
-def predict_with_value_batch(boards_tensor, temperature, model):
-    B = boards_tensor.size(0)
 
-    with torch.no_grad():
-        # CAMBIO 1: El modelo es Dual-Head, ahora capturamos las dos salidas
-        # policy_logits: [B, 4096], value_out: [B, 1]
-        policy_logits, value_out = model(boards_tensor)
-
-    # --- MÁSCARA LEGAL (Sin cambios) ---
-    legal_masks = boards_tensor[:, -64:, :, :].reshape(B, 4096).bool()
-
-    # --- ESTABILIZACIÓN Y MÁSCARA (Sin cambios) ---
-    finfo = torch.finfo(policy_logits.dtype)
-    negbig = finfo.min / 4
-    logits = torch.nan_to_num(policy_logits, nan=0.0, posinf=finfo.max/4, neginf=finfo.min/4)
-    masked = logits.masked_fill(~legal_masks, negbig)
-
-    # --- SOFTMAX ---
-    probs = torch.softmax(masked / temperature, dim=1)
-
-    all_results = []
-
-    for b in range(B):
-        board_probs = probs[b]
-        board_mask = legal_masks[b]
-
-        # Extraemos índices y probabilidades legales
-        legal_indices = torch.nonzero(board_mask).squeeze(1)
-        legal_probs = board_probs[legal_indices]
-
-        # Ordenamos de mayor a menor probabilidad
-        sorted_probs, sorted_order = torch.sort(legal_probs, descending=True)
-        sorted_indices = legal_indices[sorted_order]
-
-        # Convertimos a formato UCI
-        # Mantenemos las probabilidades (scores) porque son útiles para el MCTS
-        ordered_moves = [
-            (number_to_uci(int(idx)), float(score)) 
-            for idx, score in zip(sorted_indices, sorted_probs)
-        ]
-        
-        # CAMBIO 2: Extraemos el valor escalar de la evaluación para este tablero
-        # El valor suele estar en rango [-1, 1] o [0, 1] según tu función de activación final
-        current_value = float(value_out[b].item())
-
-        # CAMBIO 3: Retornamos un diccionario o tupla que incluya el Value
-        all_results.append({
-            'moves': ordered_moves,
-            'value': current_value
-        })
-
-    return all_results
-"""
 
 def predict_with_value_batch_fast(boards_tensor, temperature, model):
     with torch.no_grad():
