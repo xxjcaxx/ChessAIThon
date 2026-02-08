@@ -425,7 +425,6 @@ As we can see, it uses `codes`, the previous dictionary of moves.
 
 # Training in a notebook
 
-[LINK TO Kaggle notebook](https://www.kaggle.com/code/xxjcaxx/cnn-pytorch-chess-generic/edit/run/223818284)
 
 > Here we only are going to see the important code, but in the notebook there are all the code necessary to train and test our model
 
@@ -535,9 +534,6 @@ However, there are some key things to consider:
 
 The goal here is to build a network that is strong enough to understand chess, but not so complicated that it becomes slow or too demanding for the computer to handle. The best balance is key to making the AI learn effectively without overloading the system.
 
-> This notebook is part of a bigger project where we train, test and deploy an AI. We have the architecture of this model stored in Github and we need to maintain the same version in all parts, so for this code, we are goin to import the model as a library from github.
-
-
 Convolutional, Normalization, and Fully Connected layers are the essential building blocks in Deep Learning architectures. Each type of layer plays a critical role in data processing and learning, especially when applied to structured data like a chess board in a **Convolutional Neural Network (CNN)**.
 
 
@@ -574,76 +570,207 @@ Convolutional, Normalization, and Fully Connected layers are the essential build
 This is the code:
 
 ```python
-class ChessNet(nn.Module):
-    def __init__(self):
-        super(ChessNet, self).__init__()
+class Mish(nn.Module):
+    """Activación Mish: x * tanh(softplus(x))"""
+    def forward(self, x):
+        return x * torch.tanh(F.softplus(x))
 
-        # Model parameters
-        bit_layers = 77
-        in_channels = bit_layers
-        base_channels = 128  # Base number of channels  # Increase!!
-        kernel_size = 3
-        padding = kernel_size // 2
-        lineal_channels = 1024
-
-        # First convolution layer (no residual needed)
-        self.conv1 = nn.Conv2d(in_channels, base_channels, kernel_size, padding=padding)
-        self.bn1 = nn.BatchNorm2d(base_channels)
-
-        # Second convolution with residual
-        self.conv2 = nn.Conv2d(base_channels, base_channels * 2, kernel_size, padding=padding)
-        self.bn2 = nn.BatchNorm2d(base_channels * 2)
-        self.res_conv2 = nn.Conv2d(base_channels, base_channels * 2, kernel_size=1)  # 1x1 conv to match channels
-
-        # Third convolution with residual
-        self.conv3 = nn.Conv2d(base_channels * 2, base_channels * 4, kernel_size, padding=padding)
-        self.bn3 = nn.BatchNorm2d(base_channels * 4)
-        self.res_conv3 = nn.Conv2d(base_channels * 2, base_channels * 4, kernel_size=1)
-
-        # Fourth convolution with residual
-        self.conv4 = nn.Conv2d(base_channels * 4, base_channels * 8, kernel_size, padding=padding)
-        self.bn4 = nn.BatchNorm2d(base_channels * 8)
-        self.res_conv4 = nn.Conv2d(base_channels * 4, base_channels * 8, kernel_size=1)
-
-        # Fully connected layers
-        self.fc1 = nn.Linear(base_channels * 8 * 8 * 8, lineal_channels)  # Retain spatial info
-        self.drop1 = nn.Dropout(p=0.4)  # Lower dropout for better accuracy
-
-        self.fc2 = nn.Linear(lineal_channels, lineal_channels)
-        self.drop2 = nn.Dropout(p=0.4)
-
-        self.fcf = nn.Linear(lineal_channels, 4096)
+class SEBlock(nn.Module):
+    """Squeeze-and-Excitation Block para atención de canales"""
+    def __init__(self, channels, reduction=16):
+        super(SEBlock, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Linear(channels, channels // reduction, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(channels // reduction, channels, bias=False),
+            nn.Sigmoid()
+        )
 
     def forward(self, x):
-        # First convolution (no residual)
-        x = F.relu(self.bn1(self.conv1(x)))
+        b, c, _, _ = x.size()
+        y = self.avg_pool(x).view(b, c)
+        y = self.fc(y).view(b, c, 1, 1)
+        return x * y.expand_as(x)
 
-        # Second layer with residual
-        res = self.res_conv2(x)
-        x = F.relu(self.bn2(self.conv2(x))) + res
+class ResBlock(nn.Module):
+    """Bloque Residual con Pre-activación y SE"""
+    def __init__(self, channels):
+        super(ResBlock, self).__init__()
+        self.bn1 = nn.BatchNorm2d(channels)
+        self.conv1 = nn.Conv2d(channels, channels, kernel_size=3, padding=1, bias=False)
+        self.bn2 = nn.BatchNorm2d(channels)
+        self.conv2 = nn.Conv2d(channels, channels, kernel_size=3, padding=1, bias=False)
+        self.se = SEBlock(channels)
+        self.activation = Mish()
 
-        # Third layer with residual
-        res = self.res_conv3(x)
-        x = F.relu(self.bn3(self.conv3(x))) + res
+    def forward(self, x):
+        residual = x
+        out = self.bn1(x)
+        out = self.activation(out)
+        out = self.conv1(out)
+        
+        out = self.bn2(out)
+        out = self.activation(out)
+        out = self.conv2(out)
+        
+        out = self.se(out)
+        return out + residual
 
-        # Fourth layer with residual
-        res = self.res_conv4(x)
-        x = F.relu(self.bn4(self.conv4(x))) + res
+class ChessNetPV_Optimized(nn.Module):
+    def __init__(self, num_blocks=6): # 6 o 12 bloques es mucho más profundo que el original
+        super(ChessNetPV_Optimized, self).__init__()
 
-        # Flatten while keeping spatial information
-        x = x.view(x.size(0), -1)
+        in_channels = 77
+        base_channels = 256 # Ancho constante profesional 
+        head_bottleneck_channels = 32 # Para reducir parámetros en FC [6]
+        
 
-        # Fully connected layers
-        x = F.relu(self.fc1(x))
-        x = self.drop1(x)
+        # Entrada inicial
+        self.conv_input = nn.Conv2d(in_channels, base_channels, kernel_size=3, padding=1, bias=False)
+        
+        # Torre Residual (Cuerpo de la red)
+        self.res_tower = nn.Sequential(
+            *[ResBlock(base_channels) for _ in range(num_blocks)]
+        )
+        
+        # BN y Activación final de la torre (por arquitectura de pre-activación)
+        self.final_bn = nn.BatchNorm2d(base_channels)
+        self.final_act = Mish()
 
-        x = F.relu(self.fc2(x))
-        x = self.drop2(x)
+        # --- CABEZAL DE POLÍTICA (4096 salidas) ---
+        self.policy_conv = nn.Conv2d(base_channels, head_bottleneck_channels, kernel_size=1)
+        self.policy_bn = nn.BatchNorm2d(head_bottleneck_channels)
+        self.policy_fc = nn.Linear(head_bottleneck_channels * 8 * 8, 4096)
 
-        x = self.fcf(x)
+        # --- CABEZAL DE VALOR (1 salida) ---
+        self.value_conv = nn.Conv2d(base_channels, head_bottleneck_channels, kernel_size=1)
+        self.value_bn = nn.BatchNorm2d(head_bottleneck_channels)
+        self.value_fc1 = nn.Linear(head_bottleneck_channels * 8 * 8, 256)
+        self.value_fc2 = nn.Linear(256, 1)
+        self.tanh = nn.Tanh()
 
-        return x
+    def forward(self, x):
+        # Cuerpo
+        x = self.conv_input(x)
+        x = self.res_tower(x)
+        x = self.final_act(self.final_bn(x))
+
+        # Política
+        p = F.relu(self.policy_bn(self.policy_conv(x)))
+        p = p.view(p.size(0), -1)
+        policy = self.policy_fc(p)
+
+        # Valor
+        v = F.relu(self.value_bn(self.value_conv(x)))
+        v = v.view(v.size(0), -1)
+        value = F.relu(self.value_fc1(v))
+        value = self.tanh(self.value_fc2(value))
+
+        return policy, value
 ```
+
+The ChessNetPV architecture represents a contemporary implementation of a dual neural network for chess, designed under the principles of reinforcement learning and Monte Carlo tree search (MCTS) that were popularized by systems such as AlphaZero and Leela Chess Zero.1This structure is based on a residual convolutional body responsible for the extraction of spatial features and two heads dedicated to the prediction of policy (probability distribution on legal moves) and value (scalar evaluation of position).1The following section presents a comprehensive examination of its learning capabilities, its parametric bottlenecks, and the architectural optimization strategies needed to maximize its playing strength without compromising computational efficiency.
+
+The ChessNetPV architecture uses a 77-bit-layer input. In the design of neural networks for board games, the quality of the input representation determines the upper limit of the model's generalization capacity.5A 77-layer system suggests a coding that includes the location of the pieces (12 planes), castling information, turn, and possibly a history of previous moves to capture the dynamics of the position and the triple repetition rule.1In comparison, AlphaZero uses 119 planes, most of which correspond to the history of the last eight positions, allowing the network to identify temporal patterns such as pressure building up on a flank or the exhaustion of a piece's mobility.
+The ChessNetPV network body deviates from the industry standard by employing aggressive channel expansion instead of a constant depth rook.9While AlphaZero maintains 256 filters across 20 or 40 residual blocks, ChessNetPV doubles the number of channels at each stage, culminating in 1024 channels in its fourth convolutional layer.
+
+The strategy of increasing network width (channels) improves the network's ability to represent a greater variety of features at a single point on the board. However, in chess, the complexity of the game often lies in long-range relationships that can only be captured through depth (layers).7Each convolutional layer with a 3x3 kernel expands the network's receptive field linearly. With only four layers, ChessNetPV's receptive field is limited, making it difficult to integrate information between distant squares, such as coordinating a rook on a1 and a bishop on h8.7
+
+| Architectural Attribute | ChessNetPV (Original) | AlphaZero | Leela Chess Zero (T78) |
+| :---- | :---- | :---- | :---- |
+| Convolutional Layers | 4 | 40+ | 80+ |
+| Maximum Channels | 1024 | 256 | 512 |
+| Tower Structure | Expansive | Constant | Constant (SE-ResNet) |
+| Receptive Field | Moderate | Full | Complete (with attention) |
+
+Research on architectures such as KataGo and Leela Chess Zero indicates that it is preferable to use a moderate number of channels (e.g., 192 or 256\) but with a larger number of residual blocks to allow the network to perform multiple reasoning steps on the same position.9Each additional block allows the squares to "converse" with each other, refining the understanding of tactical concepts such as pins, discovered attacks, and king safety.4
+
+The inclusion of residual connections in ChessNetPV is a critical component to avoid gradient fading during deep network training.15However, using $1 \\times 1$ convolutions on the identity path (res\_conv2, res\_conv3, res\_conv4) to equalize the number of channels introduces a computational and parametric load that does not directly contribute to nonlinear feature extraction.11  
+In an ideal residual network, the learned function is $H(x) \= F(x) \+ x$. When $x$ and $F(x)$ have different dimensions, a linear transformation $W\_s x$ is applied to adjust the dimensions. Although ChessNetPV implements this correctly, the massive increase in channels to 1024 causes these $W\_s$ matrices to become extremely large, consuming GPU memory that could be used more effectively in the depth of the residual tower.18
+
+One of the most critical points of the current architecture is the fc1 layer. Flattening the output of conv4 generates an input vector of 1024 × 8 × 8 \= 65,536 elements. Connecting this to a hidden layer of 1024 neurons, the number of weights in this single layer is:
+
+$$65,536 \\times 1,024 \= 67,108,864$$  
+This volume of parameters in a single layer is problematic for three fundamental reasons:
+
+1. **Risk of Overfitting**The network has the ability to memorize specific positions from the training database instead of generalizing strategic principles.18  
+2. **Loss of Board Topology**By converting the feature map of $8 \\times 8$ into a flat vector before processing policy and value, the network loses its sense of spatial proximity in its final stages. The dense layer weights must laboriously relearn that cell e4 is close to d4, a relationship that convolutional layers naturally maintain.7 
+3. **Inference Latency**In real-time or deep search applications with MCTS, the time required to perform matrix multiplications of this size drastically reduces the number of nodes evaluated per second.
+
+The most significant improvement implemented in Leela Chess Zero was the transition from standard residual blocks to blocks with Squeeze-and-Excitation layers.9These blocks allow the network to perform selective attention on information channels, "exciting" the relevant planes and "squeezing" those containing noise for the current position.  
+The SE mechanism consists of two phases:
+
+* **Squeeze**A Global Average Pooling reduces each feature map of $8 \\times 8$ to a single scalar value, summarizing the global channel information.28  
+* **Excitation**A small bottleneck of dense layers (with a reduction factor of 16\) calculates a weight vector that is multiplied by the original map.29
+
+Mathematically, if $U$ is the output of a convolution, the SE operation recalibrates $U$ to obtain $\\tilde{U}$ by:
+
+$$\\tilde{u}\_c \= \\sigma(g(z, W)) \\cdot u\_c$$  
+Where $z$ is the compressed vector and $\\sigma$ is the sigmoid function.28This addition increases the network's ability to discern abstract concepts, such as the relative importance of open diagonals versus closed columns, at minimal parametric cost.
+
+ChessNetPV uses ReLU, which is prone to the "dead neurons" problem during intensive reinforcement learning training.31The Mish activation function has proven superior in multiple chess engine tests, offering a smoother loss surface and better retention of small negative information.31  
+Mish is defined as $x \\cdot \\tanh(\\ln(1 \+ e^x))$. Being a non-monotonic function, it allows small gradients to flow even for negative values, making it easier for the network to escape local minima during MCTS training.9
+
+| Activation Function | Advantages in Chess | Disadvantages |
+| :---- | :---- | :---- |
+| resume | Computationally cheap, it induces scarcity. | Problem of dead neurons. |
+| Mish | Better generalization, smoother gradients. | Slightly more expensive to calculate. |
+| Swish | Similar behavior to Mish, used in mink. | Less adopted in chess engines. |
+
+The current ChessNetPV structure follows the convolution \-\> batchnorm \-\> activation pattern. A pre-activation architecture (where normalization and activation occur before convolution) has been shown to allow for a much cleaner flow of identity across the network.16This is vital in chess, where the signal from the original board must persist through many layers so that the network does not "forget" the exact location of a critical piece while processing abstract tactical concepts.15
+
+### Policy Header Evaluation and Movement Mapping
+
+The ChessNetPV policy header emits a vector of 4096 elements. This corresponds to a simplified mapping of 64 source squares to 64 destination squares (64 × 64 \= 4096). While functional, this approach is inefficient compared to AlphaZero's 8 × 8 × 73 planar scheme.1  
+In the AlphaZero system, the 73 planes encode the semantics of movement:
+
+* **56 plans**for queen-type movements (8 directions x 7 distances).6  
+* **8 plans**for horse movements.6  
+* **9 plans**for special promotions (rook, bishop, knight in three directions of capture/advance).6
+
+Using a flat output of 4096, the ChessNetPV network implicitly learns that a move from e2 to e4 is similar to a move from d2 to d4 (a two-square advance). In a convolutional representation of the policy, these moves would share the same "vertical advance" filters, significantly accelerating the learning of the game's rules and basic tactics.26Since the user wants to maintain the output of 4096, the improvement should focus on how that vector is reached from the intermediate convolutional layers.
+
+### Implementation of Bottlenecks in the Print Heads
+
+To solve the problem of 67 million parameters in fc1, a channel reduction convolution must be applied before flattening. Instead of going directly from 1024 channels to a linear layer, it is recommended to add a 1 × 1 convolutional layer that reduces the channels from 1024 to a small number, such as 32\.17  
+This change would transform the input of the dense layer:
+
+* **Before**$1024 ÷ 8 ÷ 8 \= 65,536$ entries.  
+* **After**$32 ÷ 8 ÷ 8 \= 2,048 entries.
+
+By reducing the input from 65k to 2k, the number of weights in the first dense layer falls from 67 million to approximately 2 million.17This parametric "saving" allows the network's capacity to be redistributed towards the convolutional body, increasing the number of residual layers (depth) without exceeding the total memory budget or computing time.11
+
+### Value head
+
+The current value head predicts a single scalar using a tanh function. While this matches the required output, the training benefits from a richer internal signal. Modern engines like Lc0 often train a value head that independently predicts the probabilities of win ($W$), draw ($D$), and lose ($L$) (WDL head).9  
+The benefit of the WDL approach is that it allows the network to distinguish between dry positions (high probability of a draw) and chaotic positions with similar evaluations but higher risk. To maintain compatibility with ChessNetPV, the value $V \= P(W) \- P(L)$ can be calculated internally and returned as the single scalar required by the function signature.9
+
+| Value Header | Structure | Learning Signal |
+| :---- | :---- | :---- |
+| Escalar (ChessNetPV) | 1 exit (Tanh) | Poor (final result only). |
+| WDL (Proposed) | 3 outputs (Softmax) | Rich (includes probability of draws). |
+| MLH (Optional) | Estimate of remaining movements | Useful for endgames and checkmate speed. |
+
+Including a Dropout layer (0.4) in ChessNetPV is adequate to prevent overfitting in dense layers, but with the bottleneck reduction proposed above, the dropout value could be reduced to 0.2 or 0.3, as the network would have less tendency towards memorization and more towards robust feature extraction in the convolutional body.38
+
+
+### Analisys
+
+The learning capacity of a chess network is manifested in its ability to overcome static material evaluation and understand positional compensation. With its current architecture, ChessNetPV has a limited "view" of only a few steps of interaction between pieces due to its shallow depth.7
+
+For a neural network to understand a concept like the "bayonet attack" in the King's Indian Defense, it must integrate information from the entire board. A network with only four convolutional layers has an effective receptive field of approximately 9x9 squares in its outermost layer. While this covers the 8x8 board, information from opposite corners is only contained in a single final neuron, weakening the network's ability to coordinate attacks on both flanks simultaneously.
+Increasing the depth to a tower of 12-20 residual blocks of constant width (e.g., 256 filters) would ensure that each square on the board receives information from all other squares multiple times at each inference step.1This would allow the network to learn "double front" tactics and deep prophylaxis maneuvers, characteristics of grandmaster-level play.
+
+The ChessNetPV architecture is a solid starting point but suffers from inefficient parameter allocation. The massive investment of resources in the final fully connected layers detracts from the convolutional rook, which is where the real "analysis" of the chess position takes place.  
+To transform ChessNetPV into a world-class engine while maintaining tensor compatibility:
+
+* **Prioritize Depth over Breadth**: Change the expansive scheme (128-1024) to a constant one (256-256) with more layers.
+* **Eliminate the Linear Bottleneck**: Use a reduction convolution ($1 \\times 1 \\times 32$) before the linear layers to save 65 million parameters. 
+* **Add Channel Support (SE)**Implement Squeeze-and-Excitation on each residual block to improve the relative importance of features. 
+* **Optimize Activations**: Migrate from ReLU to Mish to ensure a more stable and in-depth training experience.
+
+These architectural improvements allow the neural network not only to "see" the pieces on the board, but also to understand underlying tensions and long-term strategic plans, significantly enhancing its learning capacity without prohibitively increasing memory usage or computation time. Compatibility remains unchanged, but the model's internal intelligence is substantially refined, bringing it closer to the performance standards set by leading projects in modern chess computing.
 
 ## Training 
 
@@ -954,7 +1081,7 @@ model.load_state_dict(torch.load(model_route))
 
 * Using a **CNN (Convolutional Neural Network)** to predict the best move from a chess position.
 * Input is a **77-layer 8×8 matrix** representing the board.
-* The model has **4 convolutional layers, batch normalization, and fully connected layers** leading to **4096 possible move outputs**.
+* The model has **4 convolutional layers, batch normalization, and fully connected layers** leading to **4096 possible move outputs** and a **Value**.
 
 **Move Representation**
 
@@ -975,12 +1102,42 @@ model.load_state_dict(torch.load(model_route))
 * **Train/Test Split:** 80% training, 20% testing.
 * **Epochs:** Start with **10-30 epochs**, use **early stopping** to prevent overfitting.
 
----
 
-## **Next Steps**
-
-✅ Finalize training parameters.
-✅ Implement **MCTS** for better move selection.
-✅ Deploy API and test from a webpage.
-
-
+1. AlphaZero \- Chessprogramming wiki, s'hi ha accedit el dia de febrer 6, 2026,[https://www.chessprogramming.org/AlphaZero](https://www.chessprogramming.org/AlphaZero)  
+2. Policy or Value? Loss Function and Playing Strength in AlphaZero-like Self-play \- LIACS, s'hi was accessed on February 6, 2026, [https://liacs.leidenuniv.nl/\~plaata1/papers/CoG2019.pdf](https://liacs.leidenuniv.nl/~plaata1/papers/CoG2019.pdf)  
+3. Enhancing Chess Reinforcement Learning with Graph Representation \- arXiv, s'hi ha accedit el dia de febrer 6, 2026,[https://arxiv.org/html/2410.23753v1](https://arxiv.org/html/2410.23753v1)  
+4. Acquisition of chess knowledge in AlphaZero \- PNAS, listed and accessed on February 6, 2026, [https://www.pnas.org/doi/10.1073/pnas.2206625119](https://www.pnas.org/doi/10.1073/pnas.2206625119)  
+5. A summary of DeepMind's general reinforcement learning algorithm, AlphaZero | by Umer Hasan | Medium, s'hi has accessed on February 6, 2026, [https://medium.com/@umerhasan17/a-summary-of-the-general-reinforcement-learning-game-playing-algorithm-alphazero-755f1de1ce38](https://medium.com/@umerhasan17/a-summary-of-the-general-reinforcement-learning-game-playing-algorithm-alphazero-755f1de1ce38)  
+6. How AlphaZero Works \- Augmented Lawyer, s'hi ha accedit el dia de febrer 6, 2026,[https://augmentedlawyer.com/2019/01/27/how-alphazero-works/](https://augmentedlawyer.com/2019/01/27/how-alphazero-works/)  
+7. Transformer Progress | Leela Chess Zero, accessed February 6, 2026,[https://lczero.org/blog/2024/02/transformer-progress/](https://lczero.org/blog/2024/02/transformer-progress/)  
+8. An OpenAI gym environment for chess, using the state-action representation method employed in AlphaZero \- GitHub, s'hi ha accedit el dia de febrer 6, 2026, [https://github.com/ryanrudes/AlphaZero-gym](https://github.com/ryanrudes/AlphaZero-gym)  
+9. Project History \- Leela Chess Zero, accessed February 6, 2026,[https://lczero.org/dev/wiki/project-history/](https://lczero.org/dev/wiki/project-history/)  
+10. Network architecture of AlphaZero \[closed\] \- Data Science Stack Exchange, s'hi ha accedit el dia de febrer 6, 2026, [https://datascience.stackexchange.com/questions/25786/network-architecture-of-alphazero](https://datascience.stackexchange.com/questions/25786/network-architecture-of-alphazero)  
+11. Exploring the Latest Neural Network Architectural Components in AlphaZero \- Artificial Intelligence & Machine Learning Lab, s'hi ha accedit el dia de febrer 6, 2026, [https://ml-research.github.io/papers/krieg2024exploring.pdf](https://ml-research.github.io/papers/krieg2024exploring.pdf)  
+12. Question about the network architecture of AlphaGo Zero : r/cbaduk \- Reddit, s'hi accessed on February 6, 2026, [https://www.reddit.com/r/cbaduk/comments/8bs9l5/question\_about\_the\_network\_architecture\_of/](https://www.reddit.com/r/cbaduk/comments/8bs9l5/question_about_the_network_architecture_of/)  
+13. Leela Chess Zero \- Chessprogramming wiki, s'hi ha accedit el dia de febrer 6, 2026,[https://www.chessprogramming.org/Leela\_Chess\_Zero](https://www.chessprogramming.org/Leela_Chess_Zero)  
+14. Understanding the learned look-ahead behavior of chess neural networks \- arXiv, s'hi ha accedit el dia de febrer 6, 2026, [https://arxiv.org/html/2505.21552v1](https://arxiv.org/html/2505.21552v1)  
+15. Writing ResNet from Scratch in PyTorch \- DigitalOcean, s'hi ha accedit el dia de febrer 6, 2026,[https://www.digitalocean.com/community/tutorials/writing-resnet-from-scratch-in-pytorch](https://www.digitalocean.com/community/tutorials/writing-resnet-from-scratch-in-pytorch)  
+16. Understanding ResNets: A Deep Dive into Residual Networks with PyTorch \- Wandb, s'hi ha accedit el dia de febrer 6, 2026, [https://wandb.ai/amanarora/Written-Reports/reports/Understanding-ResNets-A-Deep-Dive-into-Residual-Networks-with-PyTorch--Vmlldzo1MDAxMTk5](https://wandb.ai/amanarora/Written-Reports/reports/Understanding-ResNets-A-Deep-Dive-into-Residual-Networks-with-PyTorch--Vmlldzo1MDAxMTk5)  
+17. Reducing Data Bottlenecks in Distributed, Heterogeneous Neural Networks \- arXiv, accessed February 6, 2026, [https://arxiv.org/html/2410.09650v1](https://arxiv.org/html/2410.09650v1)  
+18. Reducing Parameters of Neural Networks via Recursive Tensor Approximation \- MDPI, s'hi ha accedit el dia de febrer 6, 2026,[https://www.mdpi.com/2079-9292/11/2/214](https://www.mdpi.com/2079-9292/11/2/214)  
+19. Convolutional Neural Networks with Specific Kernels for Computer Chess \- Lamsade \- Université Paris Dauphine-PSL, s'hi ha accedit el dia de febrer 6, 2026,[https://www.lamsade.dauphine.fr/\~cazenave/papers/ComparingArchitecturesChess.pdf](https://www.lamsade.dauphine.fr/~cazenave/papers/ComparingArchitecturesChess.pdf)  
+20. Neural Networks \- Chessprogramming wiki, s'hi ha accedit el dia de febrer 6, 2026,[https://www.chessprogramming.org/Neural\_Networks](https://www.chessprogramming.org/Neural_Networks)  
+21. Why is it common in Neural Network to have a decreasing number of neurons as the Network becomes deeper? \- Quora, s'hi ha accedit el dia de febrer 6, 2026, [https://www.quora.com/Why-is-it-common-in-Neural-Network-to-have-a-decreasing-number-of-neurons-as-the-Network-becomes-deeper](https://www.quora.com/Why-is-it-common-in-Neural-Network-to-have-a-decreasing-number-of-neurons-as-the-Network-becomes-deeper)  
+22. · Issue \#47 · glinscott/leela-chess · GitHub, accessed February 6, 2026, [https://github.com/glinscott/leela-chess/issues/47](https://github.com/glinscott/leela-chess/issues/47)  
+23. NN Input Question for Game of Chess. · Issue \#254 · suragnair/alpha-zero-general \- GitHub, accessed February 6, 2026, [https://github.com/suragnair/alpha-zero-general/issues/254](https://github.com/suragnair/alpha-zero-general/issues/254)  
+24. Reinforcement Learning with DNNs: AlphaGo to AlphaZero, accessed February 6, 2026, [https://www.biostat.wisc.edu/\~craven/cs760/lectures/AlphaZero.pdf](https://www.biostat.wisc.edu/~craven/cs760/lectures/AlphaZero.pdf)  
+25. How do you encode a chess move in a neural network? \- AI Stack Exchange, s'hi ha accedit el dia de febrer 6, 2026, [https://ai.stackexchange.com/questions/6069/how-do-you-encode-a-chess-move-in-a-neural-network](https://ai.stackexchange.com/questions/6069/how-do-you-encode-a-chess-move-in-a-neural-network)  
+26. Alphazero probabilities vector \- machine learning \- Stack Overflow, s'hi ha accedit el dia de febrer 6, 2026,[https://stackoverflow.com/questions/75762162/alphazero-probabilities-vector](https://stackoverflow.com/questions/75762162/alphazero-probabilities-vector)  
+27. Budget Alpha Zero trained to play chess in Python | by Hengbin Fang \- Medium, accessed on February 6, 2026, [https://hengbin.medium.com/training-budget-alphazero-to-play-chess-with-an-8-month-gpu-in-pytorch-d8e3d2556c16](https://hengbin.medium.com/training-budget-alphazero-to-play-chess-with-an-8-month-gpu-in-pytorch-d8e3d2556c16)  
+28. Neural network topology | Leela Chess Zero, s'hi ha accedit el dia de febrer 6, 2026,[https://lczero.org/dev/old/nn/](https://lczero.org/dev/old/nn/)  
+29. Introduction to Squeeze-Excitation Networks \- Towards Data Science, accessed February 6, 2026, [https://towardsdatascience.com/introduction-to-squeeze-excitation-networks-f22ce3a43348/](https://towardsdatascience.com/introduction-to-squeeze-excitation-networks-f22ce3a43348/)  
+30. Squeeze and Excitation Networks Explained with PyTorch Implementation, s'hi ha accedit el dia de febrer 6, 2026, [https://amaarora.github.io/posts/2020-07-24-SeNet.html](https://amaarora.github.io/posts/2020-07-24-SeNet.html)  
+31. Performance Comparison of Activation Functions in CNN-Based Model for Metal Surface Defect Detection \- IOSR Journal, s'hi ha accedit el dia de febrer 6, 2026, [https://www.iosrjournals.org/iosr-jeee/Papers/Vol20-Issue4/Ser-1/E2004012833.pdf](https://www.iosrjournals.org/iosr-jeee/Papers/Vol20-Issue4/Ser-1/E2004012833.pdf)  
+32. APTx: Better Activation Function than MISH, SWISH, and ReLU's Variants used in Deep Learning \- SvedbergOpen, s'hi ha accedit el dia de febrer 6, 2026, [https://www.svedbergopen.com/files/1666089614\_(5)\_IJAIML20221791212945BU5\_(p\_56-61).pdf](https://www.svedbergopen.com/files/1666089614_\(5\)_IJAIML20221791212945BU5_\(p_56-61\).pdf)  
+33. Performance Evaluation of Activation Functions in Extreme Learning Machine, s'hi ha accedit el dia de febrer 6, 2026, [https://www.esann.org/sites/default/files/proceedings/2023/ES2023-31.pdf](https://www.esann.org/sites/default/files/proceedings/2023/ES2023-31.pdf)  
+34. Swish Vs Mish: Latest Activation Functions \- Krutika Bapat, accessed on February 6, 2026, [https://krutikabapat.github.io/Swish-Vs-Mish-Latest-Activation-Functions/](https://krutikabapat.github.io/Swish-Vs-Mish-Latest-Activation-Functions/)  
+35. pytorch-cifar/models/preact\_resnet.py at master · kuangliu/pytorch ..., s'hi ha accedit el dia de febrer 6, 2026,[https://github.com/kuangliu/pytorch-cifar/blob/master/models/preact\_resnet.py](https://github.com/kuangliu/pytorch-cifar/blob/master/models/preact_resnet.py)  
+36. Bridging the human–AI knowledge gap through concept discovery and transfer in AlphaZero, accessed on February 6, 2026, [https://www.pnas.org/doi/10.1073/pnas.2406675122](https://www.pnas.org/doi/10.1073/pnas.2406675122)  
+37. How Many Hidden Layers to Use in Leela Chess Zero? \#1887 \- GitHub, s'hi ha accedit el dia de febrer 6, 2026, [https://github.com/LeelaChessZero/lc0/discussions/1887](https://github.com/LeelaChessZero/lc0/discussions/1887)  
+38. Squeeze-and-Excitation SqueezeNext: An Efficient DNN for Hardware Deployment \- IU Indianapolis ScholarWorks, s'hi ha accedit el dia de febrer 6, 2026, [https://scholarworks.indianapolis.iu.edu/bitstream/1805/25157/1/Chappa2020Squeeze.pdf](https://scholarworks.indianapolis.iu.edu/bitstream/1805/25157/1/Chappa2020Squeeze.pdf)

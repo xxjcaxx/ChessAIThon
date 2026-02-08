@@ -1,58 +1,5 @@
 # Exploring Chessmaro AI Model
 
-```mermaid
-graph TD
-    subgraph Input Layer
-        A[Input: 77x8x8 Tensor Board State]
-    end
-
-    subgraph Feature Extraction CNN Blocks
-        direction TB
-
-        %% Block 1: Initial Convolution
-        A --> C{Conv1: 77 -> 128 channels}
-        C --> D[Batch Norm + ReLU]
-        
-        %% Block 2: Residual Block (128 -> 256 channels)
-        D --> E_MAIN{Conv2: 128 -> 256 Main Path}
-        D --> E_SKIP{Res Conv2: 1x1, 128 -> 256 Skip Path}
-        E_MAIN --> F[Batch Norm + ReLU]
-        E_SKIP --> G(Add Residual)
-        F --> G
-        G --> H[Output: 256x8x8]
-
-        %% Block 3: Residual Block 256 -> 512 channels
-        H --> I_MAIN{Conv3: 256 -> 512 Main Path}
-        H --> I_SKIP{Res Conv3: 1x1, 256 -> 512 Skip Path}
-        I_MAIN --> J[Batch Norm + ReLU]
-        I_SKIP --> K(Add Residual)
-        J --> K
-        K --> L[Output: 512x8x8]
-
-        %% Block 4: Residual Block 512 -> 1024 channels
-        L --> M_MAIN{Conv4: 512 -> 1024 Main Path}
-        L --> M_SKIP{Res Conv4: 1x1, 512 -> 1024 Skip Path}
-        M_MAIN --> N[Batch Norm + ReLU]
-        M_SKIP --> O(Add Residual)
-        N --> O
-        O --> P[Output: 1024x8x8]
-    end
-
-    subgraph Policy Head Fully Connected
-        
-        P --> Q[Flatten 1024*8*8 = 65536 units]
-        
-        Q --> R{FC1: Linear 65536 -> 1024}
-        R --> S[ReLU + Dropout p=0.4]
-
-        S --> T{FC2: Linear 1024 -> 1024}
-        T --> U[ReLU + Dropout p=0.4]
-
-        U --> V{FCF: Linear 1024 -> 4096}
-        V --> Z[Policy Output Vector 4096 Moves]
-    end
-```
-
 # Visualizing results
 
 We have trained a CNN based neural network AI to solve chess situations. But we don't know if it works well or not. We are going to analyze the results by various ways. It will be usefull to understand how this model works.

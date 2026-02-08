@@ -72,19 +72,12 @@ A **Neural Network (NN)** is essentially a system designed to learn patterns fro
 * **Hidden Layers (The Core Analysis):** These are the internal processing stages where the real work happens. In our model, these layers are primarily **Convolutional Neural Network (CNN) layers**—they scan the board, identifying **spatial patterns** like pawn structures, weak squares, or dangerous attacks. Each hidden layer extracts increasingly complex features.
 * **Output Layer:** This is the final processing station. For the Chessmarro AI, the output is a **Policy**—a list of probabilities indicating how good or likely each possible move is. This output guides the Monte Carlo Tree Search.
 
-***
+The optimized model follows a **Dual-Head Architecture**. Instead of just predicting the next move (the **Policy head**), the network simultaneously predicts the expected outcome of the game—win, loss, or draw (the **Value head**). By forcing the network to learn both *what to do* and *how good the position is* at the same time, the internal representations become much richer. The Value head uses a `Tanh` activation to output a score between -1 and 1, providing the **Monte Carlo Tree Search (MCTS)** with a concrete evaluation of the board without needing to simulate the game until the very end.
 
-### 2. ReLU: The Decision Gate
+To help the model focus on the most important parts of a position, we have implemented **Squeeze-and-Excitation (SE) Blocks**. Think of this as a spotlight or an **attention mechanism**. The SE block "squeezes" the information from the entire board to understand the global context and then "excites" (amplifies) the specific feature channels that are most relevant to the current state—such as focusing more on "open files" during a rook endgame. This allows `ChessNet` to prioritize critical strategic information over noise.
 
-To make the assembly line smart, we need to introduce complexity, or **non-linearity**, into the process. If a layer only performed simple math (addition and multiplication), the entire deep network would just be one giant, simple math problem. The power of Deep Learning comes from being able to model **complex, non-linear relationships**—like how a seemingly passive move can set up a winning endgame, or how a sacrifice leads to a checkmate.
+While standard CNNs pass data linearly from one layer to the next, the **Chessmarro Optimized Model** utilizes **Residual Learning**. By implementing `ResBlock` components, the network uses "skip connections" that allow the original input signal to bypass certain layers and be added back to the processed output. This architecture prevents the "Vanishing Gradient Problem" in very deep networks—like our 6 to 12-block tower—ensuring that the training signal remains strong even as the model grows in complexity. This allows the AI to develop a much deeper "strategic intuition" without becoming impossible to train.
 
-This non-linearity is achieved using an **Activation Function**. Our network predominantly uses the **Rectified Linear Unit (ReLU)**.
-
-* **The ReLU Concept:** After a neuron processes its inputs, ReLU acts as a **simple switch or decision gate**:
-    * If the result of the calculation is **positive**, the signal **passes through** to the next layer.
-    * If the result is **negative** or zero, the signal is **stopped** (it becomes zero).
-
-This simple action allows the network to ignore irrelevant or "unimportant" patterns while amplifying the significant ones, enabling it to learn the complex strategic nuances of the game.
 
 
 #### Comparing Activation Functions
@@ -102,6 +95,11 @@ The activation function is, metaphorically, the **decision gate** on the neuron'
 * **Concept** As previously explained, ReLU is a simple and powerful switch: it passes positive signals through unchanged and stops negative signals by setting them to zero. Solves the Vanishing Gradient Problem because the slope is constant for all positive values (it's always 1), the error signal doesn't shrink during Backpropagation. This allows the signal to travel effectively through the *many* hidden layers of a deep CNN, ensuring all layers are actively learning. It is extremely simple to calculate (a simple conditional check), making the network train and run much faster than the alternatives.
 
 For the **ChessAIThon** project, speed and deep learning capability are paramount. The **ChessNet** is a deep CNN built to find complex patterns, so **ReLU** is the necessary choice for all hidden layers to ensure fast, stable, and effective training, leaving Sigmoid or Tanh only for the final output layer if a specific range is required. 
+
+
+#### 4. Advanced Activation: Mish
+
+The optimized architecture implements **Mish**, a self-regularized, non-monotonic activation function (). Unlike ReLU, which abruptly cuts off negative values at zero, Mish provides a smooth curve that allows for a small amount of negative information to flow through. This smoothness helps the gradient flow more effectively during **Backpropagation**, leading to better accuracy and faster convergence during the training of the `ChessNetPV_Optimized` model.
 
 ***
 
