@@ -214,7 +214,7 @@ class ResBlock(nn.Module):
         return out + residual
 
 class ChessNetPV_Optimized(nn.Module):
-    def __init__(self, num_blocks=12): # 6 o 12 bloques es mucho más profundo que el original
+    def __init__(self, num_blocks=6): # 6 o 12 bloques es mucho más profundo que el original
         super(ChessNetPV_Optimized, self).__init__()
 
         in_channels = 77
@@ -275,7 +275,7 @@ def init_model():
     print(model)
 
     # Load the model
-    model_path = "chessmarro_v8_final.pth"
+    model_path = "chessmarro_v7_final.pth"
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.eval()
     return model, device
