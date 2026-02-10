@@ -221,6 +221,177 @@ This flow guarantees that:
 * Each client receives the correct prediction asynchronously, even if batches mix requests from different processes.
 
 
+## Discarted CNN
+
+```python
+
+class ChessNetPV(nn.Module):
+    def __init__(self):
+        super(ChessNetPV, self).__init__()
+
+        # Model parameters
+        bit_layers = 77
+        in_channels = bit_layers
+        base_channels = 128  # Base number of channels  # Increase!!
+        kernel_size = 3
+        padding = kernel_size // 2
+        lineal_channels = 1024
+
+        # First convolution layer (no residual needed)
+        self.conv1 = nn.Conv2d(in_channels, base_channels, kernel_size, padding=padding)
+        self.bn1 = nn.BatchNorm2d(base_channels)
+
+        # Second convolution with residual
+        self.conv2 = nn.Conv2d(base_channels, base_channels * 2, kernel_size, padding=padding)
+        self.bn2 = nn.BatchNorm2d(base_channels * 2)
+        self.res_conv2 = nn.Conv2d(base_channels, base_channels * 2, kernel_size=1)  # 1x1 conv to match channels
+
+        # Third convolution with residual
+        self.conv3 = nn.Conv2d(base_channels * 2, base_channels * 4, kernel_size, padding=padding)
+        self.bn3 = nn.BatchNorm2d(base_channels * 4)
+        self.res_conv3 = nn.Conv2d(base_channels * 2, base_channels * 4, kernel_size=1)
+
+        # Fourth convolution with residual
+        self.conv4 = nn.Conv2d(base_channels * 4, base_channels * 8, kernel_size, padding=padding)
+        self.bn4 = nn.BatchNorm2d(base_channels * 8)
+        self.res_conv4 = nn.Conv2d(base_channels * 4, base_channels * 8, kernel_size=1)
+
+        # Fully connected layers
+        self.fc1 = nn.Linear(base_channels * 8 * 8 * 8, lineal_channels)  # Retain spatial info
+        self.drop1 = nn.Dropout(p=0.4)  # Lower dropout for better accuracy
+
+        self.fc2 = nn.Linear(lineal_channels, lineal_channels)
+        self.drop2 = nn.Dropout(p=0.4)
+
+        # Política: Salida de 4096 movimientos
+        self.fcf = nn.Linear(lineal_channels, 4096)
+        
+        # Valor: Salida de 1 escalar (Evaluación de la posición)
+        self.fc_value_1 = nn.Linear(lineal_channels, 256)
+        self.fc_value_2 = nn.Linear(256, 1)
+        self.tanh = nn.Tanh() # Para rango [-1, 1]
+
+    def forward(self, x):
+        # First convolution (no residual)
+        x = F.relu(self.bn1(self.conv1(x)))
+
+        # Second layer with residual
+        res = self.res_conv2(x)
+        x = F.relu(self.bn2(self.conv2(x))) + res
+
+        # Third layer with residual
+        res = self.res_conv3(x)
+        x = F.relu(self.bn3(self.conv3(x))) + res
+
+        # Fourth layer with residual
+        res = self.res_conv4(x)
+        x = F.relu(self.bn4(self.conv4(x))) + res
+
+        # Flatten while keeping spatial information
+        x = x.view(x.size(0), -1)
+
+        # Fully connected layers
+        x = F.relu(self.fc1(x))
+        x = self.drop1(x)
+
+        x = F.relu(self.fc2(x))
+        x = self.drop2(x)
+
+        # Policy
+        policy = self.fcf(x)
+
+        # Value
+        value = F.relu(self.fc_value_1(x))
+        value = self.tanh(self.fc_value_2(value))
+        
+
+        return policy, value
+
+
+
+class ResBlock(nn.Module):
+    """
+    Standard Residual Block with 2 convolutions.
+    Keeps information flow stable allowing for deeper networks.
+    """
+    def __init__(self, channels):
+        super(ResBlock, self).__init__()
+        self.conv1 = nn.Conv2d(channels, channels, kernel_size=3, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(channels)
+        self.conv2 = nn.Conv2d(channels, channels, kernel_size=3, padding=1, bias=False)
+        self.bn2 = nn.BatchNorm2d(channels)
+
+    def forward(self, x):
+        residual = x
+        out = F.relu(self.bn1(self.conv1(x)))
+        out = self.bn2(self.conv2(out))
+        out += residual
+        out = F.relu(out)
+        return out
+
+class ChessNetPV2(nn.Module):
+    def __init__(self):
+        super(ChessNetPV2, self).__init__()
+
+        # --- Architecture Configuration ---
+        # Instead of doubling channels rapidly (which explodes parameters),
+        # we use a constant channel depth with more layers (ResNet Tower).
+        # This is the AlphaZero/Leela approach.
+        self.input_channels = 77
+        self.tower_channels = 256  # High capacity, constant depth
+        self.num_res_blocks = 6    # Can be increased (e.g., 10, 20) for stronger play without massive param growth
+        
+        # --- Input Stem ---
+        self.conv_input = nn.Conv2d(self.input_channels, self.tower_channels, kernel_size=3, padding=1, bias=False)
+        self.bn_input = nn.BatchNorm2d(self.tower_channels)
+
+        # --- Residual Tower ---
+        self.res_tower = nn.Sequential(
+            *[ResBlock(self.tower_channels) for _ in range(self.num_res_blocks)]
+        )
+
+        # --- Policy Head ---
+        # We reduce channels to 32 before flattening. 
+        # Old method: 1024 channels * 64 squares = 65,536 inputs to FC (Too big!)
+        # New method: 32 channels * 64 squares = 2,048 inputs to FC (Efficient!)
+        self.policy_conv = nn.Conv2d(self.tower_channels, 32, kernel_size=1)
+        self.policy_bn = nn.BatchNorm2d(32)
+        self.policy_fc = nn.Linear(32 * 8 * 8, 4096) # Output matches original requirement
+
+        # --- Value Head ---
+        # Reduces to 16 channels, then small dense layers.
+        self.value_conv = nn.Conv2d(self.tower_channels, 16, kernel_size=1)
+        self.value_bn = nn.BatchNorm2d(16)
+        self.value_fc1 = nn.Linear(16 * 8 * 8, 256)
+        self.value_fc2 = nn.Linear(256, 1)
+
+    def forward(self, x):
+        # 1. Stem
+        x = F.relu(self.bn_input(self.conv_input(x)))
+
+        # 2. Residual Tower
+        x = self.res_tower(x)
+
+        # 3. Policy Head
+        p = self.policy_conv(x)
+        p = self.policy_bn(p)
+        p = F.relu(p)
+        p = p.view(p.size(0), -1) # Flatten
+        policy = self.policy_fc(p)
+        # Note: LogSoftmax or Softmax is usually applied in the loss function, 
+        # but raw logits are standard output for the model class.
+
+        # 4. Value Head
+        v = self.value_conv(x)
+        v = self.value_bn(v)
+        v = F.relu(v)
+        v = v.view(v.size(0), -1) # Flatten
+        v = F.relu(self.value_fc1(v))
+        value = torch.tanh(self.value_fc2(v))
+
+        return policy, value
+```
+
 
 # Links:
 
