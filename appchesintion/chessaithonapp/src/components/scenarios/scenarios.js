@@ -268,6 +268,22 @@ class ScenariosComponent extends HTMLElement {
 
 
 
+    this.querySelector("#show_your_scenarios").addEventListener("click", () => {
+      this.querySelector("#yourScenarios").classList.remove("is-hidden");
+      this.querySelector("#loadedScenariosDiv").classList.add("is-hidden");
+      this.querySelector("#show_your_scenarios").classList.add("is-active");
+      this.querySelector("#show_loaded_scenarios").classList.remove("is-active");
+    });
+
+    this.querySelector("#show_loaded_scenarios").addEventListener("click", () => {
+      this.querySelector("#yourScenarios").classList.add("is-hidden");
+      this.querySelector("#loadedScenariosDiv").classList.remove("is-hidden");
+      this.querySelector("#show_your_scenarios").classList.remove("is-active");
+      this.querySelector("#show_loaded_scenarios").classList.add("is-active");
+    });
+
+
+
 
 
     // fin connected callback

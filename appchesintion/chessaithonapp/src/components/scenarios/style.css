@@ -11,5 +11,16 @@ background: linear-gradient(45deg, #0f255fff, #0f255fff, #602f83ff);
 
 .scenariosListDiv{
      overflow: auto;
-     height: 40vh;
+     height: 50vh;
+}
+
+
+.panel.is-dark p.panel-heading{
+    background-color: #303039;
+    color: white;
+}
+
+.panel-block.has-text-white{
+    background-color: #303039;
+    color: white;
 }
