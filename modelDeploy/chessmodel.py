@@ -275,7 +275,7 @@ def init_model():
     print(model)
 
     # Load the model
-    model_path = "chessmarro_v8_final.pth"
+    model_path = "chessmarro_v9_final.pth"
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.eval()
     return model, device
