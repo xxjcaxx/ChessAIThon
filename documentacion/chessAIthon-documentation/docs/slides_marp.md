@@ -1,14 +1,14 @@
 ---
 marp: true
 theme: default
-style: @import "slides.css";
+style: '@import "slides.css";'
 paginate: true
 
 ---
 
 <!-- _class: lead -->
 
-# ChessAIThon
+# ChessAIThon Slides
 ### Strategic Gaming, Coding, and AI in VET Education
 
 ![bg left:40% width:450px](Exploring%20Chessmaro%20AI%20Model_files/logoblanc.png)
