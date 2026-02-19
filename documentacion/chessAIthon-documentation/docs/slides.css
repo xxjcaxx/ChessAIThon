@@ -1,0 +1,173 @@
+/* @theme custom-gamma */
+
+@import 'default';
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=Fira+Code:wght@400;500&display=swap');
+
+:root {
+  --color-background: #0b0c1e;
+  --color-foreground: #e1e1e6;
+  --color-heading: #ffffff;
+  --color-accent: #ff4b5c; /* Neon pinkish-red from PDF */
+  --color-secondary: #00d4ff; /* Cyan accent */
+  --color-dimmed: #9494b8;
+  --color-card-bg: rgba(255, 255, 255, 0.05);
+  --color-border: rgba(255, 255, 255, 0.1);
+  --font-default: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  --font-code: 'Fira Code', monospace;
+}
+
+section {
+    font-family: var(--font-default);
+    font-size: 24px;
+    padding: 60px 80px;
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    line-height: 1.6;
+}
+
+/* Background image handling */
+section::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(circle at 80% 20%, rgba(0, 212, 255, 0.05) 0%, transparent 50%),
+                radial-gradient(circle at 10% 80%, rgba(255, 75, 92, 0.05) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: -1;
+}
+
+/* Headings */
+h1, h2, h3 {
+    font-family: var(--font-default);
+    font-weight: 700;
+    margin: 0;
+    color: var(--color-heading);
+}
+
+h1 {
+    font-size: 2em;
+    margin-bottom: 0.5em;
+    letter-spacing: -0.02em;
+}
+
+h2 {
+    font-size: 1.8em;
+    margin-bottom: 1.2em;
+    border-bottom: none;
+    position: relative;
+    padding-bottom: 10px;
+}
+
+h2::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 60px;
+    height: 4px;
+    background: linear-gradient(90deg, var(--color-accent), var(--color-secondary));
+    border-radius: 2px;
+}
+
+h3 {
+    color: var(--color-secondary);
+    font-size: 1.1em;
+    margin-top: 20px;
+    margin-bottom: 15px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+/* Lists */
+ul {
+    list-style-type: none;
+    padding-left: 0;
+}
+
+li {
+    margin-bottom: 10px;
+    position: relative;
+    padding-left: 30px;
+}
+
+li::before {
+    content: '•';
+    position: absolute;
+    left: 0;
+    color: var(--color-accent);
+    font-weight: bold;
+}
+
+/* Card Style for content */
+section.cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+}
+
+.card {
+    background: var(--color-card-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    padding: 24px;
+    backdrop-filter: blur(10px);
+}
+
+/* Footer */
+footer {
+    font-size: 14px;
+    color: var(--color-dimmed);
+    bottom: 30px;
+}
+
+/* Lead Slide */
+section.lead {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    background: linear-gradient(135deg, #0b0c1e 0%, #1a1b3a 100%);
+    text-align: left;
+}
+
+section.lead h1 {
+    font-size: 4em;
+    color: #ffffff;
+    margin-bottom: 10px;
+}
+
+.logos-container {
+    display: flex;
+    gap: 30px;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+section.lead p {
+    font-size: 1.4em;
+    color: var(--color-dimmed);
+    margin-top: 0;
+}
+
+/* Strong text */
+strong {
+    color: var(--color-secondary);
+}
+
+/* Code */
+code {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: var(--color-secondary);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-family: var(--font-code);
+}
+
+/* Image scaling & styling */
+img {
+    border-radius: 12px;
+    border: 1px solid var(--color-border);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+}
