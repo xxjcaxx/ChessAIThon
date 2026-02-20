@@ -4,8 +4,20 @@ from pydantic import BaseModel
 import multiprocessing as mp
 import uuid
 
+from fastapi.middleware.cors import CORSMiddleware
+
+
+
 def create_api(task_q, tasks_result_q):
     app = FastAPI()
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],  # en producción pon tu dominio
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     class Req(BaseModel):
         fen: str

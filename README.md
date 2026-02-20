@@ -33,3 +33,7 @@ Where to go next
 - Check `documentacion/` for technical docs.
 
 ![jpg](./logoschess/erasmus_plus_ok.jpg)
+
+
+en jaquemate falla el servidor
+el cliente debe dar las otras opciones

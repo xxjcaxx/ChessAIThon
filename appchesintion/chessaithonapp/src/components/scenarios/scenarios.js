@@ -124,7 +124,10 @@ class ScenariosComponent extends HTMLElement {
 
     const storedBestMoves = loadLocalStorage();
 
+
     this.state.storedScenarios.next(storedBestMoves);
+    //console.log(storedBestMoves);
+
 
 
     // Tabla de escenarios guardados
@@ -152,25 +155,26 @@ class ScenariosComponent extends HTMLElement {
     }
 
 
-    fromEvent(scenariosListDiv, "mouseover").pipe(
-      map(event => event.target),
-      filter(target => target.tagName === "TD" && target.dataset.fen),
-      map(target => target.dataset.fen)
+    fromEvent(scenariosListDiv.querySelectorAll("td"), "mouseover").pipe(
+      map(event => event.currentTarget),
+      filter(target =>  target.dataset.fen),
+      map(target => target.dataset.fen),
+      //tap(fen => console.log("Mostrar fen: ", fen))
     ).subscribe(fen => {
       this.state.displayFen.next(fen);
     });
 
-    fromEvent(scenariosListDiv, "mouseout").pipe(
-      filter(event => event.target.tagName === "TD")
+    fromEvent(scenariosListDiv.querySelectorAll("td"), "mouseout").pipe(
+      //filter(event => event.target.tagName === "TD")
     ).subscribe(() => {
       resetDisplayFen();
     });
 
 
-    fromEvent(scenariosListDiv, "click").pipe(
-      filter(event => event.target.tagName === "TD")
+    fromEvent(scenariosListDiv.querySelectorAll("td"), "click").pipe(
+      filter(event => event.currentTarget.dataset.fen)
     ).subscribe((event) => {
-      const fen = event.target.dataset.fen;
+      const fen = event.currentTarget.dataset.fen;
       this.state.currentFen.next(fen);
       this.state.displayFen.next(fen);
     });
@@ -209,11 +213,24 @@ class ScenariosComponent extends HTMLElement {
     });
 
 
+    const loadDataIntoTable = (data) => {
+      const rows = data.split("\n").map((r) => {
+        const [fen, move, value] = r.split(",");
+        return ({ fen: fen.trim().replace(/^"(.*)"$/, '$1'), 
+          move: move ? move.trim().replace(/^"(.*)"$/, '$1') : null, 
+          value:  value ? parseFloat(value.trim().replace(/^"(.*)"$/, '$1')) : 0.0 });
+      }).filter(row => validateFen(row.fen).ok);
+      console.log(rows);
+      
+      loadedscenariosListTableTbody.replaceChildren(...fensToRows([...rows]));
+    };
+
+
     this.querySelector('#load-defaults-button').addEventListener('click', async () => {
       const response = await fetch("chess_endgames.csv");
       const data = await response.text();
-      const rows = data.split("\n").map((r) => ({ fen: r, move: null }));
-      loadedscenariosListTableTbody.replaceChildren(...fensToRows([...rows]));
+      loadDataIntoTable(data);
+
     });
 
 
@@ -222,9 +239,8 @@ class ScenariosComponent extends HTMLElement {
       const reader = new FileReader();
       reader.onload = async (event) => {
         const data = event.target.result;
-        console.log(data);
-        const rows = data.split("\n").map((r) => ({ fen: r, move: null }));
-        loadedscenariosListTableTbody.replaceChildren(...fensToRows([...rows]));
+        loadDataIntoTable(data);
+
       };
       reader.readAsText(file);
     });
@@ -233,14 +249,13 @@ class ScenariosComponent extends HTMLElement {
       const link = this.querySelector('#linktocsv').value;
       const response = await fetch(link);
       const data = await response.text();
-      console.log(data);
-      const rows = data.split("\n").map((r) => ({ fen: r, move: null }));
-      loadedscenariosListTableTbody.replaceChildren(...fensToRows([...rows]));
+      loadDataIntoTable(data);
 
     });
 
     this.querySelector('#saveCSVButton').addEventListener('click', async () => {
-      const storedBestMoves = this.state.storedScenarios.getValue();
+      //loadLocalStorage(); // Asegurarse de cargar los datos más recientes
+      const storedBestMoves = loadLocalStorage();
       console.log(storedBestMoves);
       const headers = Object.keys(storedBestMoves[0]);
 
