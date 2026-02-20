@@ -54,6 +54,7 @@ const sidebars = {
       items: [
         'technical_memory',
         'auto_generated_technical_docs',
+        'slides_marp'
       ],
     },
 

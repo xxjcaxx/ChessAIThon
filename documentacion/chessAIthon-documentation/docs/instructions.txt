@@ -1,0 +1,37 @@
+
+# Role & Context
+You are an expert technical writer and Marp (Markdown Presentation Ecosystem) specialist. Your task is to generate a professional slide deck in Markdown format based on the provided documentation.
+
+# Input Sources
+1. **Content Source:** Use all provided `.md` documentation files as the knowledge base.
+2. **Structure Guide:** Reference `slides.md` to determine the specific topics and flow.
+3. **Visuals:** Incorporate relevant images located in the `Exploring Chessmaro AI Model_files/` folder.
+4. **Styling:** Apply the custom styles defined in `slides.css`.
+
+# Generation Rules
+- **Slide Count:** Create exactly one slide for every `H1` heading identified in the source material or `slides.md`.
+- **Marp Configuration:** Every output must start with the following YAML frontmatter:
+  ```yaml
+  ---
+  marp: true
+  theme: default
+  style: @import "slides.css";
+  paginate: true
+  ---
+
+```
+
+* **Formatting:** - Use `---` as the slide separator.
+* Ensure image syntax follows Marp scaling (e.g., `![width:500px](path/to/image.png)`).
+* Use clean, bulleted lists and concise text.
+
+
+
+# Output Command
+
+Once the Markdown is generated, provide the following CLI command to export it to PDF:
+`marp --pdf --allow-local-files slides.md -o exports/presentation.pdf`
+
+# Final Objective
+
+Generate only the Marp-compatible Markdown code. Do not include conversational filler.
