@@ -23,11 +23,16 @@ class PlayComponent extends HTMLElement {
         const board = document.createElement("chess-board");
 
         this.state.state$.subscribe(gs => {
+            board.state.movesHistory.next([...board.state.movesHistory.getValue(),
+                { fen: board.dataset.fen, move: gs.lastMove}])
             board.dataset.fen = gs.fen;
+            //board.makeMove(gs.lastMove);
+            
+            
             board.state.currentFen.next(gs.fen);
             board.state.displayFen.next(gs.fen);
             board.state.currentTurn.next(gs.currentPlayer);
-            console.log(gs.fen);
+            //console.log(gs.fen , board.state.movesHistory.getValue());
             
         });
 
@@ -44,7 +49,7 @@ class PlayComponent extends HTMLElement {
             this.state.players = players;
         });
 
-        // Start game button
+        // Start game button http://10.100.22.119:8000/predict
     }
 
 

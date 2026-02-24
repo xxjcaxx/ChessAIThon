@@ -49,6 +49,7 @@ def apply_dirichlet_noise(moves_with_scores, epsilon=0.35, alpha=0.2):
         adjusted_score = (1 - epsilon) * score + epsilon * noise[i]
         new_moves.append((move, adjusted_score))
         
+    #print(noise,new_moves,moves_with_scores)
     return new_moves
 
 class MCTSNode:
@@ -420,7 +421,7 @@ def mcts_worker_persistent(batcher_q, mcts_result_q, worker_response_queue, task
 
             #local_q.put(SENTINEL)
             #worker_response_queue.put(SENTINEL)
-                
+            #print(all_moves)
             mcts_result_q.put((id, best_move, all_moves, initial_moves))
             #print("MCTS worker finished", id)
             thread_responses.clear()

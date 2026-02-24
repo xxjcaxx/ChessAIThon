@@ -65,10 +65,6 @@ def task_listener(task_q, mcts_result_q, batcher_q, tasks_result_q, worker_respo
 
         results = [mcts_result_q.get() for _ in range(n_workers)]
 
-        #print("All MCTS workers finished for task:", task)
-        # Mock result after all workers are done
-        #results = [mcts_result_q.get() for _ in range(n_workers)]
-        #print("MCTS results collected:", results)
         # 1. Acumular todas las visitas en un contador global
         total_visits = Counter()
         first_worker_initial_moves = results[0][3] if results else []
