@@ -40,16 +40,23 @@ def get_model():
 
 def task_listener(task_q, mcts_result_q, batcher_q, tasks_result_q, worker_response_queues, last_batch_avg):
     print("Task listener started")
-    n_workers = (mp.cpu_count() // 2 ) +  (mp.cpu_count() // 3 )
+    n_workers = 1 # ((mp.cpu_count() // 2 ) +  (mp.cpu_count() // 4 ))//4
     print("\033[1;36m👷 Workers:\033[0m", n_workers)
 
     #print("Task listener started", n_workers, "MCTS workers will be launched")
     worker_task_in_queues = [mp.Queue(maxsize=1) for _ in range(n_workers)]
     # Lanzamos los workers UNA SOLA VEZ
     for i in range(n_workers):
+        # Distribuir puct uniformemente entre 0.5 y 1.4 independientemente
+        # del número de workers. Si solo hay 1 worker, usar el punto medio.
+        if n_workers > 1:
+            puct = 0.5 + i * ((1.4 - 0.5) / (n_workers - 1))
+        else:
+            puct = 1.4
+
         p = mp.Process(
             target=mcts_worker_persistent, # Nueva función
-            args=(batcher_q, mcts_result_q, worker_response_queues[i], worker_task_in_queues[i], i, 0.5 + (i * (1.89 / (n_workers - 1))))
+            args=(batcher_q, mcts_result_q, worker_response_queues[i], worker_task_in_queues[i], i, puct)
         )
         p.daemon = True
         p.start()
@@ -64,12 +71,21 @@ def task_listener(task_q, mcts_result_q, batcher_q, tasks_result_q, worker_respo
             q.put(task)
 
         results = [mcts_result_q.get() for _ in range(n_workers)]
+        
+        # Filtrar resultados None (jaque mate o errores)
+        valid_results = [r for r in results if r[1] is not None]
+        
+        if not valid_results:
+            print(f"\033[1;31m⚠️  CHECKMATE - No valid moves available\033[0m")
+            tasks_result_q.put((task[0], None, 0, []))
+            print("\033[1;33m" + "━" * 65 + "\033[0m\n")
+            continue
 
         # 1. Acumular todas las visitas en un contador global
         total_visits = Counter()
-        first_worker_initial_moves = results[0][3] if results else []
+        first_worker_initial_moves = valid_results[0][3] if valid_results else []
 
-        for _, _, move_counts, _ in results:
+        for _, _, move_counts, _ in valid_results:
             for move, visits in move_counts:
                 total_visits[move] += visits
 
@@ -93,7 +109,7 @@ def task_listener(task_q, mcts_result_q, batcher_q, tasks_result_q, worker_respo
                 for move, prob in sorted_initial:
                     color = "\033[1;32m" if prob > 0.5 else "\033[1;36m" if prob > 0.2 else "\033[0;90m"
                     formatted_initial.append(f"{move} {color}({prob:.3f})\033[0m")
-                print(f"Red's Intuition: {' | '.join(formatted_initial)}")
+                print(f"NN's Intuition: {' | '.join(formatted_initial)}")
 
             # 5. Imprimir Alternatives (Visitas)
             if alternatives:
@@ -114,7 +130,10 @@ def task_listener(task_q, mcts_result_q, batcher_q, tasks_result_q, worker_respo
                 print("\033[1;33m" + "━" * 65 + "\033[0m")
                 
         tasks_result_q.put((task[0], best_move_final, total_score_final, alternatives)) 
-        #print("Total visits:", total_visits)
+        # Mostrar el arreglo de visitas por movimiento y su suma total
+        total_sum = sum(total_visits.values())
+        #print(f"\033[1;34m🔢 Total visits per move:\033[0m {dict(total_visits)}")
+        #print(f"\033[1;34m🔢 Sum of all visits:\033[0m {total_sum}")
         avg, total, todas = last_batch_avg[0], last_batch_avg[1], last_batch_avg[2]
         #print(f"Media: {avg}, Incompletos: {total}, Todos los batches: {todas}")
         print(

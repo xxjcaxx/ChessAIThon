@@ -49,7 +49,7 @@ def apply_dirichlet_noise(moves_with_scores, epsilon=0.35, alpha=0.2):
         adjusted_score = (1 - epsilon) * score + epsilon * noise[i]
         new_moves.append((move, adjusted_score))
         
-    #print(noise,new_moves,moves_with_scores)
+    #print(new_moves)
     return new_moves
 
 class MCTSNode:
@@ -61,6 +61,7 @@ class MCTSNode:
         self.visits = 0  # Number of times this node has been visited
         self.value = 0  # Total reward (win/loss/draw) from simulations
         self.prior_p = prior_p  # El score que la red le dio a esta jugada
+        self.predicted_value = None  # Valor predicho por la red al expandir este nodo
         # Guardamos los movimientos que get_best_function nos dio.
         # Si priority_moves es [(move1, score1), (move2, score2)...]
         self.untried_moves = priority_moves if priority_moves is not None else []
@@ -126,32 +127,43 @@ class MCTSNode:
 # Define the MCTS algorithm
 class MCTS:
     def __init__(self, root_state, get_best_function, simulations=100, puct=1.4):
+        self.get_best_function = get_best_function
+        self.simulations = simulations
+        self.puct = puct
+        
         # 1. Obtenemos la predicción completa (Diccionario) de la raíz
-        prediction = get_best_function(root_state)
+        prediction = self._evaluate_state(root_state)
+        
         
         # 2. Extraemos y normalizamos las jugadas
         moves_with_scores = filter_by_cumulative_probability(prediction['moves'])
 
         # 2. Inyectamos Ruido (SOLO en la raíz)
         moves_with_noise = apply_dirichlet_noise(moves_with_scores)
+       
+        print("🌳 Root moves after noise (top 10):\n", [(m, f"{s:.3f}") for m, s in moves_with_noise[:10]])
         
         self.initial_moves = list(prediction['moves'])  # Guardamos esto para análisis o visualización futura
-        
-        
-
-        # 3. Extraemos el valor de la red
-        # Si el valor es relativo al que mueve, lo dejamos tal cual
-        rchaoot_nn_value = prediction['value']
-        
-        #print(f"Evaluación inicial de la red:  {moves_with_noise[0][0]} {root_nn_value:.3f}")
-        #print(f"Evaluación inicial de la red: {root_nn_value:.3f}",f" Mejor jugada inicial: {moves_with_noise}")
 
         # 4. Creamos la raíz e inyectamos el valor inicial
         self.root = MCTSNode(root_state, priority_moves=moves_with_noise)
-       
-        self.get_best_function = get_best_function
-        self.simulations = simulations
-        self.puct = puct
+        for move_str, prior_p in self.root.untried_moves[:]:
+            new_state = self.root.state.copy()
+            new_state.push(chess.Move.from_uci(move_str))
+            
+            # Evalúa con la red (single-threaded)
+            prediction = self.get_best_function(new_state)
+            child_moves = filter_by_cumulative_probability(prediction['moves'])
+            child_value = prediction['value']
+            
+            new_node = MCTSNode(new_state, parent=self.root, move=move_str, 
+                                priority_moves=child_moves, prior_p=prior_p)
+            new_node.predicted_value = child_value
+            
+            self.root.children.append(new_node)
+        # Ahora todos los movimientos de la raíz están expandidos
+        self.root.untried_moves = []  # Ya no queda nada por explorar
+
 
     def _apply_vloss(self, path):
         for node in path:
@@ -162,6 +174,38 @@ class MCTS:
         for node in path:
             with node.lock:
                 node.vloss -= 1
+
+    def _evaluate_state(self, state):
+        """Evalúa un estado, manejando la perspectiva de negras correctamente.
+        La red está entrenada solo con el turno de las blancas, así que:
+        1. Si es turno de negras, invertimos el tablero (mirror)
+        2. Llamamos a la red con el tablero invertido
+        3. Invertimos los movimientos de la respuesta
+        """
+        is_black = (state.turn == chess.BLACK)
+        state_to_eval = state.mirror() if is_black else state
+        
+        prediction = self.get_best_function(state_to_eval)
+        
+        if is_black:
+            # Invertir los movimientos
+            moves_mirrored = []
+            for move_uci, score in prediction['moves']:
+                move = chess.Move.from_uci(move_uci)
+                mirrored = chess.Move(
+                    from_square=chess.square_mirror(move.from_square),
+                    to_square=chess.square_mirror(move.to_square),
+                    promotion=move.promotion
+                )
+                moves_mirrored.append((mirrored.uci(), score))
+            prediction['moves'] = moves_mirrored
+           
+            # 2. ¡CLAVE!: Invertir el signo del VALUE
+            # Si la red dice -0.893 para las negras, devolvemos 0.893
+            # para que el backpropagate lo asigne correctamente al padre.
+            #prediction['value'] = -prediction['value']
+        
+        return prediction
     
     def multi_thread_run(self, num_simulations):
         max_d = 0
@@ -182,7 +226,9 @@ class MCTS:
         # 1. SELECCIÓN: Bajamos mientras el nodo esté totalmente expandido
         while node.is_fully_expanded() and not node.state.is_game_over():
             next_node = node.best_child(self.puct)
-            if next_node is None: break
+            if next_node is None: 
+               # print("Warning: best_child returned None during selection. This should not happen if the tree is properly expanded.")
+                break
             node = next_node
             path.append(node)
 
@@ -201,77 +247,40 @@ class MCTS:
                     new_state = node.state.copy()
                     new_state.push(chess.Move.from_uci(move_str))
                     
-                    # Petición a la GPU FUERA DEL LOCK
-                    prediction = self.get_best_function(new_state)
-                    
-                    #child_moves = normalize_moves(prediction['moves'])
-                    # Filtramos los que mayor probabilidad acumulen
+                    prediction = self._evaluate_state(new_state)
                     child_moves = filter_by_cumulative_probability(prediction['moves'])
-
                     child_value = prediction['value']
-                    
+
                     new_node = MCTSNode(new_state, parent=node, move=move_str, 
                                         priority_moves=child_moves, prior_p=score)
+                    new_node.predicted_value = child_value
                     
                     with node.lock:
                         node.children.append(new_node)
                     
-                    self._backpropagate(new_node, child_value)
+                    self._backpropagate(new_node, -child_value)
                 else:
                         # Si llegamos aquí y no hay untried_moves pero tampoco es game_over,
                         # es que ya estaba expandido. Hacemos backpropagate del valor conocido.
                         # (Opcional: puedes pedir una nueva evaluación si quieres)
                         self._backpropagate(node, 0) 
+            if node.state.is_game_over():
+                #print("Terminal node reached at depth", current_depth)
+                result = node.state.result()
+
+                if result == "1-0":
+                    # Ganan blancas
+                    terminal_value = 1 if node.state.turn == chess.WHITE else -1
+
+                elif result == "0-1":
+                    # Ganan negras
+                    terminal_value = 1 if node.state.turn == chess.BLACK else -1
+                else:
+                    terminal_value = 0
+                self._backpropagate(node, terminal_value)
         finally:
             self._remove_vloss(path)
         return current_depth
-
-    def _select(self, node):
-        # Traverse down the tree to find a leaf node
-        if node.state.is_game_over():
-            return node
-        while node.is_fully_expanded() and not node.state.is_game_over():
-            node = node.best_child(self.puct)
-        return node
-
-    def _expand(self, node):
-        if node.state.is_game_over():
-            return node
-
-        if not node.untried_moves:
-            return node
-
-        idx = random.randrange(len(node.untried_moves))
-        move, score = node.untried_moves.pop(idx)
-
-        new_state = node.state.copy()
-        move_obj = chess.Move.from_uci(move)
-
-        if node.state.is_capture(move_obj):
-            captured = node.state.piece_at(move_obj.to_square)
-            if captured and captured.piece_type == chess.KING:
-                return node  # o continue / skip
-
-        new_state.push(move_obj)
-
-        # 1. Llamamos a la red para la raíz
-        prediction = get_best_function(new_state)
-        
-        # 2. Extraemos y normalizamos solo las jugadas
-        # prediction['moves'] es [(uci, score), (uci, score)...]
-        priority_moves = normalize_moves(prediction['moves'])
-
-        #priority_moves = normalize_moves(self.get_best_function(new_state))
-        new_node = MCTSNode(
-            new_state,
-            parent=node,
-            move=move,
-            priority_moves=priority_moves,
-            prior_p=score
-        )
-
-        node.children.append(new_node)
-        return new_node
 
     
 
@@ -290,7 +299,7 @@ class MCTS:
 
 
 def mcts_worker_persistent(batcher_q, mcts_result_q, worker_response_queue, task_in_q, id, puct):
-    n_threads = 8
+    n_threads = 64
     
 
     local_q = queue.Queue()
@@ -394,6 +403,17 @@ def mcts_worker_persistent(batcher_q, mcts_result_q, worker_response_queue, task
             simulations = task[2]
 
             board = chess.Board(fen)
+            
+            # Verificar si el FEN está en jaque mate
+            #print("checkmate:", board.is_checkmate())
+            #print("stalemate:", board.is_stalemate())
+            #print("legal moves:", list(board.legal_moves))
+            if board.is_checkmate() or board.is_stalemate() or board.is_insufficient_material():
+                print(f"\033[1;31m⚠️  Worker {id}: FEN en JAQUE MATE - retornando None\033[0m")
+                mcts_result_q.put((id, None, [], []))
+                thread_responses.clear()
+                continue
+            
             #print("Initial board for MCTS:\n", board)
             #root = MCTSNode(state=board)
             mcts = MCTS(root_state=board, get_best_function=get_best_move, simulations=simulations, puct=puct)
@@ -408,8 +428,9 @@ def mcts_worker_persistent(batcher_q, mcts_result_q, worker_response_queue, task
             worker_max_depth = max(r[0] for r in results)
             worker_avg_depth = sum(r[1] for r in results) / len(results)
 
-            #print(f"Worker {id} [PUCT {puct:.1f}]: Max Depth: {worker_max_depth}, Avg Depth: {worker_avg_depth:.2f}")
-            
+            print(f"Worker {id} [PUCT {puct:.1f}]: Max Depth: {worker_max_depth}, Avg Depth: {worker_avg_depth:.2f}")
+            print("Root visits:", mcts.root.visits)
+            print("Sum children:", sum(c.visits for c in mcts.root.children))
 
             with mcts.root.lock:
                 best_child = max(mcts.root.children, key=lambda c: c.visits)
@@ -418,6 +439,26 @@ def mcts_worker_persistent(batcher_q, mcts_result_q, worker_response_queue, task
                 ###########################3
                 initial_moves = mcts.initial_moves  # Movimientos iniciales con ruido y filtrados
                 #print(f"Worker {id} initial moves: {initial_moves}")
+                # Imprimir valores predichos por la red para hijos de primer nivel
+                if(id==0): # Solo lo imprimimos para el primer worker para no saturar la consola
+                    try:
+                        vals = []
+                        for c in mcts.root.children:
+                            pv = c.predicted_value if hasattr(c, 'predicted_value') else None
+                            if pv is not None:
+                                if pv > 0:
+                                    color = "\033[92m"  # verde
+                                elif pv < 0:
+                                    color = "\033[91m"  # rojo
+                                else:
+                                    color = "\033[94m"  # azul para 0
+                                vals.append(f"{c.move}:{color}{pv:.3f}\033[0m")
+                            else:
+                                vals.append(f"{c.move}:None")
+
+                        print("🔮 Root children predicted values: ", " | ".join(vals))
+                    except Exception:
+                        pass
 
             #local_q.put(SENTINEL)
             #worker_response_queue.put(SENTINEL)

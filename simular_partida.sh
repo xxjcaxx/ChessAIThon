@@ -30,7 +30,7 @@ do
     # 2. Obtener la opinión de tu API (MCTS) para ese mismo FEN
     mcts_move=$(curl -s -X POST "http://127.0.0.1:8000/predict" \
     -H "Content-Type: application/json" \
-    -d "{\"fen\": \"$current_fen\", \"simulations\": 200}" \
+    -d "{\"fen\": \"$current_fen\", \"simulations\": 400}" \
     | jq -r '[.move, (.alternatives[] | .[0])] | join(",")')
     echo "MCTS output for turn %d: %s\n" "$i" "$mcts_move"
     mcts_move4000=$(curl -s -X POST "http://127.0.0.1:8000/predict" \
