@@ -1,6 +1,5 @@
 import queue
 import multiprocessing as mp
-from threading import Lock
 import threading
 import chess
 import random
@@ -12,7 +11,7 @@ import gc
 import os
 import psutil
 from chess_aux_optim import  concat_fen_legal
-import torch
+
 
 def normalize_moves(moves):
     total = sum(score for _, score in moves)
@@ -126,9 +125,8 @@ class MCTSNode:
 
 # Define the MCTS algorithm
 class MCTS:
-    def __init__(self, root_state, get_best_function, simulations=100, puct=1.4):
+    def __init__(self, root_state, get_best_function,  puct=1.4):
         self.get_best_function = get_best_function
-        self.simulations = simulations
         self.puct = puct
         
         # 1. Obtenemos la predicción completa (Diccionario) de la raíz
@@ -199,11 +197,6 @@ class MCTS:
                 )
                 moves_mirrored.append((mirrored.uci(), score))
             prediction['moves'] = moves_mirrored
-           
-            # 2. ¡CLAVE!: Invertir el signo del VALUE
-            # Si la red dice -0.893 para las negras, devolvemos 0.893
-            # para que el backpropagate lo asigne correctamente al padre.
-            #prediction['value'] = -prediction['value']
         
         return prediction
     
@@ -217,26 +210,47 @@ class MCTS:
             total_d += depth
             
         return max_d, total_d / num_simulations if num_simulations > 0 else 0
-
+   
     def thread_search(self):
         path = []
         node = self.root
-        path.append(node)
         
-        # 1. SELECCIÓN: Bajamos mientras el nodo esté totalmente expandido
-        while node.is_fully_expanded() and not node.state.is_game_over():
-            next_node = node.best_child(self.puct)
-            if next_node is None: 
-               # print("Warning: best_child returned None during selection. This should not happen if the tree is properly expanded.")
-                break
+        # 1. SELECCIÓN CON VIRTUAL LOSS DINÁMICO
+        while True:
+            with node.lock:
+                path.append(node)
+                node.vloss += 1  # Incrementamos vloss mientras bajamos
+                
+                # Decidimos si paramos de bajar:
+                # - Si el juego terminó.
+                # - Si aún tiene movimientos por expandir (es una "hoja" en proceso).
+                if node.state.is_game_over() or node.untried_moves:
+                    break
+                
+                # Seleccionamos el mejor hijo según PUCT
+                next_node = node.best_child(self.puct)
+                
+                # Si por alguna razón no hay hijos (ej. filtrado agresivo), salimos
+                if next_node is None:
+                    break
+                    
             node = next_node
-            path.append(node)
 
-        current_depth = len(path)
-        self._apply_vloss(path)
-
+        # 2. EXPANSIÓN Y EVALUACIÓN
         try:
-            if not node.state.is_game_over():
+            # Caso A: El nodo es terminal
+            if node.state.is_game_over():
+                result = node.state.result()
+                if result == "1-0":
+                    terminal_value = 1 if node.state.turn == chess.WHITE else -1
+                elif result == "0-1":
+                    terminal_value = 1 if node.state.turn == chess.BLACK else -1
+                else:
+                    terminal_value = 0
+                self._backpropagate(node, terminal_value)
+                
+            # Caso B: Expandir un nuevo nodo
+            else:
                 move_to_try = None
                 with node.lock:
                     if node.untried_moves:
@@ -247,6 +261,7 @@ class MCTS:
                     new_state = node.state.copy()
                     new_state.push(chess.Move.from_uci(move_str))
                     
+                    # Evaluación (fuera de locks para no bloquear otros hilos)
                     prediction = self._evaluate_state(new_state)
                     child_moves = filter_by_cumulative_probability(prediction['moves'])
                     child_value = prediction['value']
@@ -258,31 +273,20 @@ class MCTS:
                     with node.lock:
                         node.children.append(new_node)
                     
+                    # El valor de la red es desde la perspectiva del nuevo estado
                     self._backpropagate(new_node, -child_value)
                 else:
-                        # Si llegamos aquí y no hay untried_moves pero tampoco es game_over,
-                        # es que ya estaba expandido. Hacemos backpropagate del valor conocido.
-                        # (Opcional: puedes pedir una nueva evaluación si quieres)
-                        self._backpropagate(node, 0) 
-            if node.state.is_game_over():
-                #print("Terminal node reached at depth", current_depth)
-                result = node.state.result()
+                    # Si llegamos aquí y no hay movimientos (y no es terminal), 
+                    # es un nodo hoja ya expandido por otro hilo. Backprop de seguridad.
+                    self._backpropagate(node, 0)
 
-                if result == "1-0":
-                    # Ganan blancas
-                    terminal_value = 1 if node.state.turn == chess.WHITE else -1
-
-                elif result == "0-1":
-                    # Ganan negras
-                    terminal_value = 1 if node.state.turn == chess.BLACK else -1
-                else:
-                    terminal_value = 0
-                self._backpropagate(node, terminal_value)
         finally:
-            self._remove_vloss(path)
-        return current_depth
-
-    
+            # 3. LIMPIEZA OBLIGATORIA DEL VIRTUAL LOSS
+            for n in path:
+                with n.lock:
+                    n.vloss -= 1
+                    
+        return len(path) 
 
     def _backpropagate(self, node, value):
         # value viene desde la perspectiva del jugador en 'node'.
@@ -326,28 +330,9 @@ def mcts_worker_persistent(batcher_q, mcts_result_q, worker_response_queue, task
         t_id = threading.get_ident()
         if t_id not in thread_responses:
             thread_responses[t_id] = queue.Queue()
-        
-        # --- PASO 1: Inversión de perspectiva ---
-        # Si mueven negras, enviamos el tablero espejo (mirror)
-        is_black = (board.turn == chess.BLACK)
-        fen_to_send = board.mirror().fen() if is_black else board.fen()
-        
+        fen_to_send = board.fen() 
         local_q.put((t_id, fen_to_send))
         response = thread_responses[t_id].get() 
-        
-        # --- PASO 2: Inversión de la respuesta ---
-        if is_black:
-            # 1. Invertimos las jugadas (ej: e7e5 se convierte en e2e4)
-            moves_mirrored = [
-                (mirror_uci_move(m), s) for m, s in response['moves']
-            ]
-            # 2. El valor suele ser relativo al que mueve. 
-            # Si la red dice 0.8 para el tablero invertido de las negras, 
-            # significa que las NEGRAS están +0.8. 
-            # No necesitas invertir el signo si tu MCTS ya espera el valor 
-            # relativo al jugador actual.
-            response['moves'] = moves_mirrored
-
         return response
 
 
@@ -416,7 +401,7 @@ def mcts_worker_persistent(batcher_q, mcts_result_q, worker_response_queue, task
             
             #print("Initial board for MCTS:\n", board)
             #root = MCTSNode(state=board)
-            mcts = MCTS(root_state=board, get_best_function=get_best_move, simulations=simulations, puct=puct)
+            mcts = MCTS(root_state=board, get_best_function=get_best_move, puct=puct)
 
             #with ThreadPoolExecutor(max_workers=n_threads) as executor:
                 # Repartimos las simulaciones totales entre los hilos
@@ -436,7 +421,6 @@ def mcts_worker_persistent(batcher_q, mcts_result_q, worker_response_queue, task
                 best_child = max(mcts.root.children, key=lambda c: c.visits)
                 best_move = best_child.move
                 all_moves = [(str(c.move), c.visits) for c in mcts.root.children]
-                ###########################3
                 initial_moves = mcts.initial_moves  # Movimientos iniciales con ruido y filtrados
                 #print(f"Worker {id} initial moves: {initial_moves}")
                 # Imprimir valores predichos por la red para hijos de primer nivel
@@ -460,11 +444,9 @@ def mcts_worker_persistent(batcher_q, mcts_result_q, worker_response_queue, task
                     except Exception:
                         pass
 
-            #local_q.put(SENTINEL)
-            #worker_response_queue.put(SENTINEL)
-            #print(all_moves)
+            
             mcts_result_q.put((id, best_move, all_moves, initial_moves))
-            #print("MCTS worker finished", id)
+
             thread_responses.clear()
             def clear_tree(node):
                 for child in node.children:
@@ -478,12 +460,6 @@ def mcts_worker_persistent(batcher_q, mcts_result_q, worker_response_queue, task
             del board
             gc.collect()
 
-            """def get_process_memory():
-                process = psutil.Process(os.getpid())
-                mem_info = process.memory_info()
-                return mem_info.rss / (1024 ** 2)  # Convertir a MB
-
-            print(f"Consumo del proceso actual: {get_process_memory():.2f} MB")"""
     finally:
         executor.shutdown(wait=False)
         # Enviar sentinels para cerrar sender/receiver
