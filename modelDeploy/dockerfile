@@ -1,6 +1,9 @@
 # 🛠️ NUEVO DOCKERFILE RECOMENDADO: Usando PyTorch con CUDA 12.1
 # Puedes ajustar la versión de PyTorch (ej. 2.2.0) y la versión de CUDA (ej. 12.1)
-FROM pytorch/pytorch:2.2.0-cuda12.1-cudnn8-runtime 
+#FROM pytorch/pytorch:2.2.0-cuda12.1-cudnn8-runtime 
+FROM pytorch/pytorch:2.10.0-cuda13.0-cudnn9-runtime
+
+
 
 # Evita que Python genere archivos .pyc y mejora logs
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -9,13 +12,16 @@ ENV PYTHONUNBUFFERED=1
 # El resto del Dockerfile se mantiene casi igual
 WORKDIR /app
 
+
+
+
 # Copia requirements primero (si tienes otras dependencias aparte de PyTorch)
 # NOTA: Si PyTorch ya está incluido, tu requirements.txt solo necesita Gradio y otras librerías.
 COPY requirements.txt .
 
 # Instala el resto de dependencias (Gradio, etc.)
-RUN pip install --no-cache-dir -r requirements.txt
 
+RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
 # Copia el resto de la app
 COPY . .
 
@@ -24,3 +30,4 @@ EXPOSE 7860
 
 # Comando para ejecutar la app
 CMD ["python", "app.py"]
+

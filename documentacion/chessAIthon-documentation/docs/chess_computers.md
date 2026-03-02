@@ -122,6 +122,8 @@ Stockfish has implemented NNUE in order to generate more "Human" moves: https://
 
 Stockfish’s strategy represents a hybrid milestone in the history of chess AI: unlike early engines such as Deep Blue that relied purely on brute-force search and handcrafted evaluation, and unlike modern neural systems such as AlphaZero that use deep reinforcement learning and stochastic search, Stockfish combines its powerful deterministic **alpha-beta** search with **NNUE (Efficiently Updatable Neural Networks)**, a lightweight neural evaluator trained on massive datasets. This approach keeps the speed and depth of classical engines while integrating the pattern-recognition strengths of neural networks, showing how the evolution of chess AI has moved from pure calculation, through stochastic learning, toward a synthesis of both traditions.
 
+Other approach is using **transformers** like Large Language Models as ChatGPT: https://arxiv.org/abs/2402.04494 . This approach simplifies the input, because it accepts directly FENs and it understand the `self attention` layer to understand the complete board. 
+
 
 
 ### Training Chess AI

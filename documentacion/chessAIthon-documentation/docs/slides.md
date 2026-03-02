@@ -86,3 +86,11 @@ Human can comunicate with computers in FEN and UCI
 * ChessAIThon provides a Notebook to transform your dataset to 77x8x8 parquet format
 * You can use this dataset to fine-tuning out CNN with another Notebook
 * You can change the weiths of the CNN in deploy and play with it.
+
+
+
+
+
+Todo es una función que recibe X (fen)  y saca Y (policy value)
+
+Los pesos de la función es lo que hace que el resultado de la función sea lo más exacto
