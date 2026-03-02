@@ -135,18 +135,14 @@ class ScenariosComponent extends HTMLElement {
     const scenariosListTableTbody = scenariosListTable.querySelector("tbody");
     storedScenarios.append(scenariosListTable);
 
-    this.state.storedScenarios.subscribe((storedBestMoves) => {
-      scenariosListTableTbody.replaceChildren(...fensToRows(storedBestMoves));
-    });
+  
 
     // Escenarios cargados
     const loadedScenariosListTable = templateWrapper.querySelector("#scenariosListTable").content.querySelector("table").cloneNode(true);
     const loadedscenariosListTableTbody = loadedScenariosListTable.querySelector("tbody");
     loadedScenarios.append(loadedScenariosListTable);
 
-    this.state.loadedScenarios.subscribe((loadedScenarios) => {
-      loadedscenariosListTableTbody.replaceChildren(...fensToRows(loadedScenarios));
-    });
+
 
 
     const resetDisplayFen = () => {
@@ -154,29 +150,40 @@ class ScenariosComponent extends HTMLElement {
       this.state.displayFen.next(fen);
     }
 
+    const resetEvents = () => {
+      fromEvent(scenariosListDiv.querySelectorAll("td"), "mouseover").pipe(
+        map(event => event.currentTarget),
+        filter(target => target.dataset.fen),
+        map(target => target.dataset.fen),
+      ).subscribe(fen => {
+        this.state.displayFen.next(fen);
+      });
 
-    fromEvent(scenariosListDiv.querySelectorAll("td"), "mouseover").pipe(
-      map(event => event.currentTarget),
-      filter(target =>  target.dataset.fen),
-      map(target => target.dataset.fen),
-      //tap(fen => console.log("Mostrar fen: ", fen))
-    ).subscribe(fen => {
-      this.state.displayFen.next(fen);
+      fromEvent(scenariosListDiv.querySelectorAll("td"), "mouseout").pipe(
+        //filter(event => event.target.tagName === "TD")
+      ).subscribe(() => {
+        resetDisplayFen();
+      });
+
+
+      fromEvent(scenariosListDiv.querySelectorAll("td"), "click").pipe(
+        filter(event => event.currentTarget.dataset.fen)
+      ).subscribe((event) => {
+        const fen = event.currentTarget.dataset.fen;
+        this.state.currentFen.next(fen);
+        this.state.displayFen.next(fen);
+      });
+    }
+
+
+    this.state.loadedScenarios.subscribe((loadedScenarios) => {
+      loadedscenariosListTableTbody.replaceChildren(...fensToRows(loadedScenarios));
+      resetEvents();
     });
 
-    fromEvent(scenariosListDiv.querySelectorAll("td"), "mouseout").pipe(
-      //filter(event => event.target.tagName === "TD")
-    ).subscribe(() => {
-      resetDisplayFen();
-    });
-
-
-    fromEvent(scenariosListDiv.querySelectorAll("td"), "click").pipe(
-      filter(event => event.currentTarget.dataset.fen)
-    ).subscribe((event) => {
-      const fen = event.currentTarget.dataset.fen;
-      this.state.currentFen.next(fen);
-      this.state.displayFen.next(fen);
+      this.state.storedScenarios.subscribe((storedBestMoves) => {
+      scenariosListTableTbody.replaceChildren(...fensToRows(storedBestMoves));
+      resetEvents();
     });
 
     fromEvent(scenariosListDiv, "click").pipe(
@@ -205,7 +212,7 @@ class ScenariosComponent extends HTMLElement {
     fromEvent(this, "makeMove").subscribe((event) => {
       const storedBestMoves = loadLocalStorage();
       this.state.storedScenarios.next(storedBestMoves);
-      const ultimoElemento = storedScenarios.lastElementChild;
+      //const ultimoElemento = storedScenarios.lastElementChild;
       storedScenarios.scrollTo({
         top: storedScenarios.scrollHeight,
         behavior: 'smooth'
@@ -216,12 +223,14 @@ class ScenariosComponent extends HTMLElement {
     const loadDataIntoTable = (data) => {
       const rows = data.split("\n").map((r) => {
         const [fen, move, value] = r.split(",");
-        return ({ fen: fen.trim().replace(/^"(.*)"$/, '$1'), 
-          move: move ? move.trim().replace(/^"(.*)"$/, '$1') : null, 
-          value:  value ? parseFloat(value.trim().replace(/^"(.*)"$/, '$1')) : 0.0 });
+        return ({
+          fen: fen.trim().replace(/^"(.*)"$/, '$1'),
+          move: move ? move.trim().replace(/^"(.*)"$/, '$1') : null,
+          value: value ? parseFloat(value.trim().replace(/^"(.*)"$/, '$1')) : 0.0
+        });
       }).filter(row => validateFen(row.fen).ok);
       console.log(rows);
-      
+
       loadedscenariosListTableTbody.replaceChildren(...fensToRows([...rows]));
     };
 
@@ -251,6 +260,16 @@ class ScenariosComponent extends HTMLElement {
       const data = await response.text();
       loadDataIntoTable(data);
 
+    });
+
+    fromEvent(document.querySelector('#addYourFen'), "click").subscribe(() => {
+      const storedScenarios = this.state.storedScenarios.getValue();
+      const yourFEN = document.querySelector('#yourFen').value;
+      storedScenarios.push({ fen: yourFEN });
+      this.state.storedScenarios.next(storedScenarios);
+
+
+      localStorage.setItem('best_moves', JSON.stringify(storedScenarios));
     });
 
     this.querySelector('#saveCSVButton').addEventListener('click', async () => {

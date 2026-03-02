@@ -18,5 +18,5 @@ services:
             - capabilities: [gpu]
     volumes:
       - .:/app
-      - ../libraries/c/chessintionlib:/app/chessintionlib
+#      - ../libraries/c/chessintionlib:/app/chessintionlib
 

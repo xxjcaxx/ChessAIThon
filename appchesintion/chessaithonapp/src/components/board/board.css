@@ -1,3 +1,24 @@
 .moves-list{
     display: inline-block; list-style: none;padding:0;
 }
+
+#currentFen {
+  font-size: 0.8cqw;
+  overflow: hidden; 
+}
+
+/* Cuando la pantalla es menor de 768px (móvil) */
+@media (max-width: 768px) {
+ #currentFen {
+  font-size: 2cqw;
+  overflow: hidden; 
+}
+#movesHistoryList{
+    font-size: 1em;
+}
+}
+
+#movesHistoryList{
+    font-size: 0.5em;
+}
+

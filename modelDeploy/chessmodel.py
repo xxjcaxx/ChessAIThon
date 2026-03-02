@@ -9,7 +9,7 @@ import sys
 
 sys.path.append("./chessintionlib")  
 
-from chess_aux_c import uci_to_number, number_to_uci, concat_fen_legal, concat_fen_legal_bits, concat_fen_legal_ptr
+#from chess_aux_c import uci_to_number, number_to_uci, concat_fen_legal, concat_fen_legal_bits, concat_fen_legal_ptr
 
 
 """
@@ -280,10 +280,9 @@ def init_model():
     model.eval()
     return model, device
 
+"""
 def predict_chess_move(fen_position,model,device):
-    """
-    Given a FEN chess board position, return the best move prediction.
-    """
+
     board = concat_fen_legal(fen_position)
     board_matrix = torch.tensor(board, dtype=torch.float32)   
     board_matrix = board.unsqueeze(0).to(device)
@@ -304,5 +303,5 @@ def predict_chess_move(fen_position,model,device):
     # Convert back to the original move index
     selected_move_index = valid_indices[move_idx].item()
     return number_to_uci(selected_move_index)
-
+"""
 #r3k1nr/ppp2ppp/2np1q2/2b5/2Q1PB2/7P/PPP2P1P/RN2KB1R b KQkq - 0 8

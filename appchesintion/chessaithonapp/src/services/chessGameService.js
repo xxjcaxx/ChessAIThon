@@ -1,7 +1,7 @@
 import { Chess } from "chess.js";
 import { BehaviorSubject } from "rxjs";
 
-const createGameState = (game) => ({
+const createGameState = (game,lastMove) => ({
   board: game.board(),
   currentPlayer: game.turn(),
   ended: game.isGameOver(),
@@ -15,6 +15,7 @@ const createGameState = (game) => ({
   inCheck: game.inCheck(),
   legalMoves: game.moves({ verbose: true }).map((m) => m.lan),
   fen: game.fen(),
+  lastMove: lastMove
 });
 
 export class GameState {
@@ -33,10 +34,11 @@ export class GameState {
   set move(uci) {
     try {
       this.game.move(uci);
+      this.lastMove = uci
     } catch (error) {
       console.log(error.message);
     }
-    const newGameState = createGameState(this.game);
+    const newGameState = createGameState(this.game, uci);
     this.state$.next(newGameState);
     this.decideNextMove(newGameState);
   }
@@ -56,7 +58,7 @@ export class GameState {
         },
         body: JSON.stringify({
           fen: newGameState.fen,
-          simulations: 10  // mejor como número
+          simulations: 400  // mejor como número
         })
       }).then(response => response.json()).then(m => {
         //this.game.move(m.move);

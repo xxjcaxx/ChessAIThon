@@ -37,6 +37,9 @@ class NavbarComponent extends HTMLElement {
         navbarBurguer.addEventListener("click", () => {
             navbarMenu.classList.toggle("is-active");
         });
+        navbarMenu.addEventListener('click',()=>{
+          navbarMenu.classList.toggle("is-active");
+        });
     }
 
 }
