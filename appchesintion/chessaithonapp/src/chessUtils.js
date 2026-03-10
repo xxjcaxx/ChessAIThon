@@ -74,8 +74,8 @@ const generateMiniChessBoard = (board) => {
     if (!ctx) return canvas;
 
     const squareSize = size / 8;
-    const lightSquareColor = '#f0d9b5';
-    const darkSquareColor = '#b58863';
+    const lightSquareColor = '#e0d5ea';
+    const darkSquareColor = '#957ab0';
 
     // Función auxiliar para dibujar un cuadrado
     const drawSquare = (r, c, color) => {

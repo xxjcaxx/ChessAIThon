@@ -127,16 +127,22 @@ class MCTSNode:
 
 # Define the MCTS algorithm
 class MCTS:
-    def __init__(self, root_state, get_best_function,  puct=1.4):
+    def __init__(self, root_state, get_best_function,  puct=1.4, include_all_moves_for_tree=False):
         self.get_best_function = get_best_function
         self.puct = puct
+        self.include_all_moves_for_tree = include_all_moves_for_tree
+
+        def select_moves(pred_moves):
+            if self.include_all_moves_for_tree:
+                return normalize_moves(pred_moves)
+            return filter_by_cumulative_probability(pred_moves)
         
         # 1. Obtenemos la predicción completa (Diccionario) de la raíz
         prediction = self._evaluate_state(root_state)
         
         
         # 2. Extraemos y normalizamos las jugadas
-        moves_with_scores = filter_by_cumulative_probability(prediction['moves'])
+        moves_with_scores = select_moves(prediction['moves'])
 
         # 2. Inyectamos Ruido (SOLO en la raíz)
         moves_with_noise = apply_dirichlet_noise(moves_with_scores)
@@ -153,7 +159,7 @@ class MCTS:
             
             # Evalúa con la red (single-threaded)
             prediction = self.get_best_function(new_state)
-            child_moves = filter_by_cumulative_probability(prediction['moves'])
+            child_moves = select_moves(prediction['moves'])
             child_value = prediction['value']
             
             new_node = MCTSNode(new_state, parent=self.root, move=move_str, 
@@ -271,7 +277,10 @@ class MCTS:
                     
                     # Evaluación (fuera de locks para no bloquear otros hilos)
                     prediction = self._evaluate_state(new_state)
-                    child_moves = filter_by_cumulative_probability(prediction['moves'])
+                    if self.include_all_moves_for_tree:
+                        child_moves = normalize_moves(prediction['moves'])
+                    else:
+                        child_moves = filter_by_cumulative_probability(prediction['moves'])
                     child_value = prediction['value']
 
                     new_node = MCTSNode(new_state, parent=node, move=move_str, 
@@ -411,7 +420,13 @@ def mcts_worker_persistent(batcher_q, mcts_result_q, worker_response_queue, task
             
             #print("Initial board for MCTS:\n", board)
             #root = MCTSNode(state=board)
-            mcts = MCTS(root_state=board, get_best_function=get_best_move, puct=puct)
+            request_mcts_tree = bool(task[3]) if len(task) > 3 else False
+            mcts = MCTS(
+                root_state=board,
+                get_best_function=get_best_move,
+                puct=puct,
+                include_all_moves_for_tree=request_mcts_tree,
+            )
 
             #with ThreadPoolExecutor(max_workers=n_threads) as executor:
                 # Repartimos las simulaciones totales entre los hilos

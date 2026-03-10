@@ -68,16 +68,27 @@ class aiComponent extends HTMLElement {
                 alert("Invalid FEN string");
                 return;
             }*/
-            const { move, mcts_tree, tree } = await askAIMoveTree(apiUrl, fen, simulations, puct);
+            const { move, visits, alternatives, mcts_tree, tree } = await askAIMoveTree(apiUrl, fen, simulations, puct);
             const treeData = mcts_tree || tree;
+            const alternativesText = Array.isArray(alternatives) && alternatives.length
+                ? alternatives.map(([altMove, altVisits]) => `${altMove} (${altVisits} visits)`).join(" | ")
+                : "No alternatives returned";
 
             if (!treeData) {
-                aiSuggestedMove.textContent = `Best move: ${move || 'N/A'}. The server did not return MCTS tree data.`;
+                aiSuggestedMove.innerHTML = `
+                    Best move: <strong>${move || 'N/A'}</strong> (${visits ?? 'N/A'} visits)<br>
+                    Alternatives: ${alternativesText}<br>
+                    The server did not return MCTS tree data.
+                `;
                 return;
             }
 
             addChessPiecesToTreeNode(treeData,fen);
-            aiSuggestedMove.textContent = `Best move: ${move || 'N/A'}. Tree loaded from live AI response.`;
+            aiSuggestedMove.innerHTML = `
+                Best move: <strong>${move || 'N/A'}</strong> (${visits ?? 'N/A'} visits)<br>
+                Alternatives: ${alternativesText}<br>
+                Tree loaded from live AI response.
+            `;
             console.log(move,treeData);
 
             const treeGraphContainer = this.querySelector("chess-mcts-visualizer");

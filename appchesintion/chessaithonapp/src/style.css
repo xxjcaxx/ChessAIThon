@@ -40,3 +40,52 @@
 .file-cta{
   border-radius: 2px;
 }
+
+.home-hero-box {
+  padding: 1.25rem;
+  background: rgba(17, 17, 17, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+.home-logo {
+  object-fit: contain;
+}
+
+.home-card-link {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+
+.home-nav-card {
+  height: 100%;
+  width: 100%;
+  min-height: 180px;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(5px);
+}
+
+.home-nav-card .card-content {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.columns.is-multiline .column {
+  display: flex;
+}
+
+.home-card-image img {
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.home-card-title {
+  color: #1f2937;
+  font-weight: 700;
+}
+
+.home-card-text {
+  color: #4a4a4a;
+  line-height: 1.45;
+}
