@@ -40,6 +40,12 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+[data-theme='dark'] body,
+html[data-theme='dark'] body {
+  background: #11131a;
+  color: #e6e9ef;
+}
+
 /* Homepage hero purple theme */
 .hero.hero--primary {
   background: linear-gradient(135deg, var(--ifm-color-primary) 0%, var(--ifm-color-primary-light) 60%, #e9dcff 100%);
@@ -73,6 +79,12 @@ body {
   box-shadow: 0 6px 18px rgba(27,31,35,0.06);
 }
 
+[data-theme='dark'] .theme-doc-markdown,
+[data-theme='dark'] .docMainWrapper .container {
+  background: #1a1d26;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
 /* Typography that resembles printed docs / PDFs */
 .theme-doc-markdown, .markdown {
   font-size: 18px;
@@ -81,12 +93,24 @@ body {
   color: #202124;
 }
 
+[data-theme='dark'] .theme-doc-markdown,
+[data-theme='dark'] .markdown {
+  color: #e6e9ef;
+}
+
 /* Serif headings for a more formal/paper look */
 h1, h2, h3, h4 {
   font-family: Georgia, 'Times New Roman', Times, serif;
   color: var(--ifm-color-primary-darkest, #205d3b);
   margin-top: 1.2em;
   margin-bottom: 0.35em;
+}
+
+[data-theme='dark'] h1,
+[data-theme='dark'] h2,
+[data-theme='dark'] h3,
+[data-theme='dark'] h4 {
+  color: var(--ifm-color-primary-lightest);
 }
 
 h1 {
@@ -115,6 +139,11 @@ pre, code[class*="language-"] {
   font-family: 'SFMono-Regular', Menlo, Monaco, 'Roboto Mono', 'Courier New', monospace;
 }
 
+[data-theme='dark'] pre,
+[data-theme='dark'] code[class*="language-"] {
+  background: #151923;
+}
+
 pre {
   padding: 16px 18px;
   overflow: auto;
@@ -132,6 +161,19 @@ table th, table td {
 }
 table th {
   background: rgba(46,133,85,0.04);
+}
+
+[data-theme='dark'] table th,
+[data-theme='dark'] table td {
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+[data-theme='dark'] table th {
+  background: rgba(155, 123, 230, 0.16);
+}
+
+html[data-theme='dark'] .navbar--transparent {
+  background-color: #11131a;
 }
 
 /* Images: centered and framed */

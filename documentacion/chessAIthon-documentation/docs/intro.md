@@ -16,9 +16,9 @@ The core of ChessAIThon lies in its unconventional approach: integrating chess l
 
 This document will detail the development of key components, including:
 
-    A comprehensive online database: This dynamic repository will feature real-life chess scenarios and allow users to propose solutions, ultimately aggregating student and player contributions to train an AI. The system will leverage the Chess.js library for displaying legal moves and enable data export for archiving and version control.
+- A comprehensive online database: This dynamic repository will feature real-life chess scenarios and allow users to propose solutions, ultimately aggregating student and player contributions to train an AI. The system will displaying boards, legal moves and enable data export for archiving and version control.
 
-The Chess Artificial Intelligence Hackathon platform: This innovative competition will challenge students to use automated tools or create their own to train an AI with their documented chess moves, fostering a holistic understanding of chess strategy, computational thinking, data structures, version control, AI models, and cloud computing.
+- The Chess Artificial Intelligence Hackathon platform: This innovative competition will challenge students to use automated tools or create their own to train an AI with their documented chess moves, fostering a holistic understanding of chess strategy, computational thinking, data structures, version control, AI models, and cloud computing.
 
 By focusing on these practical applications, ChessAIThon aims to provide VET students with a more comprehensive learning experience that goes beyond basic programming, incorporating essential aspects such as effective data management, version control, and a deeper exploration of AI concepts not commonly encountered at this educational level. This technical memory serves as a testament to the project's commitment to preparing students for the technical demands of contemporary workplaces and fostering a new generation of skilled professionals in AI and frontend development.
 
@@ -40,7 +40,7 @@ By focusing on these practical applications, ChessAIThon aims to provide VET stu
 
 ## Slides
 
-[Project presentation](ChessAIThon-Integrating-Chess-Coding-and-AI.pdf)
-[AI presentation](Developing-a-Chess-AI-with-Convolutional-Neural-Networks.pdf)
-[MCTS presentation](Monte-Carlo-Tree-Search-Intelligent-Game-Strategy.pdf)
-[Full technical project presentation](presentacio.pdf)
+* [Project presentation](ChessAIThon-Integrating-Chess-Coding-and-AI.pdf)
+* [AI presentation](Developing-a-Chess-AI-with-Convolutional-Neural-Networks.pdf)
+* [MCTS presentation](Monte-Carlo-Tree-Search-Intelligent-Game-Strategy.pdf)
+* [Full technical project presentation](presentacio.pdf)

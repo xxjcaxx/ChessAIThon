@@ -50,6 +50,14 @@ const sidebars = {
 
     {
       type: 'category',
+      label: 'ChessAIthon Competition',
+      items: [
+        'chessaithon_competition',
+      ],
+    },
+
+    {
+      type: 'category',
       label: 'Memory',
       items: [
         'technical_memory',

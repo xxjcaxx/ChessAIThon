@@ -704,10 +704,11 @@ The SE mechanism consists of two phases:
 * **Squeeze**A Global Average Pooling reduces each feature map of $8 \\times 8$ to a single scalar value, summarizing the global channel information.28  
 * **Excitation**A small bottleneck of dense layers (with a reduction factor of 16\) calculates a weight vector that is multiplied by the original map.29
 
-Mathematically, if $U$ is the output of a convolution, the SE operation recalibrates $U$ to obtain $\\tilde{U}$ by:
+Mathematically, if `U` is the output of a convolution, the SE operation recalibrates each channel using a sigmoid gate and multiplies it by the original channel activation.
 
-$$\\tilde{u}\_c \= \\sigma(g(z, W)) \\cdot u\_c$$  
-Where $z$ is the compressed vector and $\\sigma$ is the sigmoid function.28This addition increases the network's ability to discern abstract concepts, such as the relative importance of open diagonals versus closed columns, at minimal parametric cost.
+In compact form: `u_tilde_c = sigmoid(g(z, W)) * u_c`.
+
+Where `z` is the compressed vector and `sigmoid` is the activation used for channel weighting. This addition increases the network's ability to discern abstract concepts, such as the relative importance of open diagonals versus closed columns, at minimal parametric cost.
 
 ChessNetPV uses ReLU, which is prone to the "dead neurons" problem during intensive reinforcement learning training.31The Mish activation function has proven superior in multiple chess engine tests, offering a smoother loss surface and better retention of small negative information.31  
 Mish is defined as $x \\cdot \\tanh(\\ln(1 \+ e^x))$. Being a non-monotonic function, it allows small gradients to flow even for negative values, making it easier for the network to escape local minima during MCTS training.9
