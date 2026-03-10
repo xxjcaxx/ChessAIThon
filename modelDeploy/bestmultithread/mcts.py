@@ -66,6 +66,7 @@ class MCTSNode:
         self.untried_moves = priority_moves if priority_moves is not None else []
         self.vloss = 0  # Contador de pérdida virtual
         self.lock = threading.Lock() # Para proteger cambios en el nodo
+        self.condition = threading.Condition(self.lock)  # Condición para esperar a que se expanda el nodo
         
 
     def is_fully_expanded(self):
@@ -108,11 +109,12 @@ class MCTSNode:
 
         
         
-    def to_dict(self, depth=3):
+    def to_dict(self, depth=4):
         node_dict = {
             "move": str(self.move),
             "value": self.value,
             "visits": self.visits,
+            "n_children": len(self.children)
         }
         if depth > 0 and self.children:
             node_dict["children"] = [child.to_dict(depth - 1) for child in self.children]
@@ -229,6 +231,12 @@ class MCTS:
                 
                 # Seleccionamos el mejor hijo según PUCT
                 next_node = node.best_child(self.puct)
+
+                if next_node is None:
+                    # CASO CRÍTICO: No hay movimientos por probar Y no hay hijos.
+                    # Alguien está expandiendo este nodo. Esperamos.
+                    if node.condition.wait(timeout=0.05): # Espera la señal de expansión
+                        next_node = node.best_child(self.puct)
                 
                 # Si por alguna razón no hay hijos (ej. filtrado agresivo), salimos
                 if next_node is None:
@@ -272,13 +280,15 @@ class MCTS:
                     
                     with node.lock:
                         node.children.append(new_node)
+                        node.condition.notify_all()  # Avisamos a otros hilos que este nodo ya tiene un hijo
                     
                     # El valor de la red es desde la perspectiva del nuevo estado
                     self._backpropagate(new_node, -child_value)
                 else:
                     # Si llegamos aquí y no hay movimientos (y no es terminal), 
                     # es un nodo hoja ya expandido por otro hilo. Backprop de seguridad.
-                    self._backpropagate(node, 0)
+                    #self._backpropagate(node, 0)
+                    pass
 
         finally:
             # 3. LIMPIEZA OBLIGATORIA DEL VIRTUAL LOSS
@@ -395,7 +405,7 @@ def mcts_worker_persistent(batcher_q, mcts_result_q, worker_response_queue, task
             #print("legal moves:", list(board.legal_moves))
             if board.is_checkmate() or board.is_stalemate() or board.is_insufficient_material():
                 print(f"\033[1;31m⚠️  Worker {id}: FEN en JAQUE MATE - retornando None\033[0m")
-                mcts_result_q.put((id, None, [], []))
+                mcts_result_q.put((id, None, [], [], None))
                 thread_responses.clear()
                 continue
             
@@ -422,6 +432,15 @@ def mcts_worker_persistent(batcher_q, mcts_result_q, worker_response_queue, task
                 best_move = best_child.move
                 all_moves = [(str(c.move), c.visits) for c in mcts.root.children]
                 initial_moves = mcts.initial_moves  # Movimientos iniciales con ruido y filtrados
+                # Serializar el árbol MCTS aprovechando los métodos del nodo
+                # Profundidad por defecto limitada para evitar payloads gigantes
+                tree_depth = 3
+                try:
+                    mcts_tree_json = mcts.root.to_json(depth=tree_depth)
+                except Exception:
+                    # En caso de error al serializar (por ejemplo, objetos no serializables),
+                    # enviamos una representación reducida
+                    mcts_tree_json = json.dumps({"move": str(mcts.root.move), "visits": mcts.root.visits})
                 #print(f"Worker {id} initial moves: {initial_moves}")
                 # Imprimir valores predichos por la red para hijos de primer nivel
                 if(id==0): # Solo lo imprimimos para el primer worker para no saturar la consola
@@ -445,7 +464,8 @@ def mcts_worker_persistent(batcher_q, mcts_result_q, worker_response_queue, task
                         pass
 
             
-            mcts_result_q.put((id, best_move, all_moves, initial_moves))
+            # Enviamos también el árbol serializado (solo JSON)
+            mcts_result_q.put((id, best_move, all_moves, initial_moves, mcts_tree_json))
 
             thread_responses.clear()
             def clear_tree(node):

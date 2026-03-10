@@ -63,6 +63,7 @@ def task_listener(task_q, mcts_result_q, batcher_q, tasks_result_q, worker_respo
 
     while True:
         task = task_q.get()
+        request_mcts_tree = bool(task[3]) if len(task) > 3 else False
         #print("Task listener received task:", task)
         board_demo = chess.Board(task[1])
         print(board_demo.unicode().replace("⭘", "·"))
@@ -77,7 +78,7 @@ def task_listener(task_q, mcts_result_q, batcher_q, tasks_result_q, worker_respo
         
         if not valid_results:
             print(f"\033[1;31m⚠️  CHECKMATE - No valid moves available\033[0m")
-            tasks_result_q.put((task[0], None, 0, []))
+            tasks_result_q.put((task[0], None, 0, [], None))
             print("\033[1;33m" + "━" * 65 + "\033[0m\n")
             continue
 
@@ -85,9 +86,14 @@ def task_listener(task_q, mcts_result_q, batcher_q, tasks_result_q, worker_respo
         total_visits = Counter()
         first_worker_initial_moves = valid_results[0][3] if valid_results else []
 
-        for _, _, move_counts, _ in valid_results:
+        for _, _, move_counts, _, *_ in valid_results:
             for move, visits in move_counts:
                 total_visits[move] += visits
+
+        best_move_final = None
+        total_score_final = 0
+        alternatives = []
+        mcts_tree_json = valid_results[0][4] if (request_mcts_tree and len(valid_results[0]) > 4) else None
 
         # 2. Determinar la jugada ganadora (la que tiene más visitas totales)
         if total_visits:
@@ -129,7 +135,7 @@ def task_listener(task_q, mcts_result_q, batcher_q, tasks_result_q, worker_respo
                 print(f"\033[1;43;30m ⚠️  MCTS CORRECTION \033[0m Red preferred \033[1;31m{best_initial_move}\033[0m but Search chose \033[1;32m{best_move_final}\033[0m")
                 print("\033[1;33m" + "━" * 65 + "\033[0m")
                 
-        tasks_result_q.put((task[0], best_move_final, total_score_final, alternatives)) 
+        tasks_result_q.put((task[0], best_move_final, total_score_final, alternatives, mcts_tree_json)) 
         # Mostrar el arreglo de visitas por movimiento y su suma total
         total_sum = sum(total_visits.values())
         #print(f"\033[1;34m🔢 Total visits per move:\033[0m {dict(total_visits)}")

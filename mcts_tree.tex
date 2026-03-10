@@ -1,0 +1,67 @@
+\documentclass[border=10pt]{standalone}
+\usepackage[utf8]{inputenc}
+\usepackage{forest}
+
+\forestset{
+    mcts/.style={
+        for tree={
+            grow'=east,
+            draw,
+            rounded corners,
+            node font=\scriptsize\sffamily,
+            align=center,
+            fill=white,
+            parent anchor=east,
+            child anchor=west,
+            edge={draw, -latex},
+            inner sep=1pt,
+            l sep=4mm,
+            s sep=2mm,
+        }
+    }
+}
+
+\begin{document}
+    
+\begin{forest}
+    mcts
+    [{Raíz \\ $N=3968$ \\ $V=-2515.36$}
+    [{d7d5 \\ $N=3564$ \\ $V=2413.68$}, fill=green!25
+    [{d2d4 \\ $N=2501$ \\ $V=-1681.16$}, fill=green!25]
+    [{g1f3 \\ $N=927$ \\ $V=-619.59$}]
+    [{e3d4 \\ $N=80$ \\ $V=-62.47$}]
+    [{e3f3 \\ $N=35$ \\ $V=-31.54$}]
+    [{e3e7 \\ $N=21$ \\ $V=-18.92$}]]
+    [{d7c7 \\ $N=194$ \\ $V=80.22$}
+    [{g1f3 \\ $N=137$ \\ $V=-44.14$}, fill=green!25]
+    [{d2d7 \\ $N=20$ \\ $V=-13.26$}]
+    [{g1e2 \\ $N=14$ \\ $V=-7.23$}]
+    [{d2d4 \\ $N=13$ \\ $V=-8.84$}]
+    [{e3d4 \\ $N=10$ \\ $V=-6.75$}]]
+    [{d7g4 \\ $N=121$ \\ $V=28.88$}
+    [{d2d4 \\ $N=56$ \\ $V=-28.79$}, fill=green!25]
+    [{e3d4 \\ $N=52$ \\ $V=11.01$}]
+    [{d2d7 \\ $N=13$ \\ $V=-11.10$}]]
+    [{h2h1 \\ $N=49$ \\ $V=-7.22$}
+    [{e3f3 \\ $N=28$ \\ $V=-11.17$}, fill=green!25]
+    [{d2d7 \\ $N=20$ \\ $V=19.23$}]
+    [{d2d4 \\ $N=1$ \\ $V=-0.84$}]]
+    [{d7d2 \\ $N=24$ \\ $V=3.93$}
+    [{e3d2 \\ $N=12$ \\ $V=7.84$}, fill=green!25]
+    [{e3e7 \\ $N=3$ \\ $V=-3.00$}]
+    [{e3c3 \\ $N=3$ \\ $V=-2.98$}]
+    [{g1e2 \\ $N=2$ \\ $V=-1.99$}]
+    [{e3f3 \\ $N=2$ \\ $V=-1.81$}]
+    [{e3d3 \\ $N=1$ \\ $V=-1.00$}]
+    [{e3a3 \\ $N=1$ \\ $V=-1.00$}]]
+    [{h2h4 \\ $N=12$ \\ $V=-2.81$}
+    [{g1f3 \\ $N=7$ \\ $V=-0.28$}, fill=green!25]
+    [{d2d7 \\ $N=4$ \\ $V=3.97$}]
+    [{d2d4 \\ $N=1$ \\ $V=-0.88$}]]
+    [{h8a8 \\ $N=4$ \\ $V=-1.32$}
+    [{g1f3 \\ $N=2$ \\ $V=0.99$}, fill=green!25]
+    [{d2d4 \\ $N=1$ \\ $V=-0.65$}]
+    [{d2d7 \\ $N=1$ \\ $V=0.98$}]]]
+\end{forest}
+    
+\end{document}

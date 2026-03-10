@@ -53,12 +53,12 @@ paginate: true
 
 # How Chess AI works?
 
-![bg left:40% width:500px](Exploring%20Chessmaro%20AI%20Model_files/convolutional.png)
+![bg left:40% width:500px](Exploring%20Chessmaro%20AI%20Model_files/Minimax-alpha-bera-pruning-cnn.png)
 -   **Rule-based Systems**: Brute-force calculation (Deep Blue).
 -   **Alpha-beta Search**: Heuristic evaluation (Stockfish).
 -   **Modern Neural Networks**: Intuition-based move prediction (AlphaZero).
--   **Hybrid Model (ChessMarro)**: 
-    - **CNN**: Provides "intuition" (Policy + Value).
+-   **Hybrid Model (ChessAIThon)**: 
+    - **NN**: Provides "intuition" (Policy + Value).
     - **MCTS**: Provides "calculation" (Look-ahead search).
 
 ---
@@ -70,6 +70,17 @@ paginate: true
 -   **Our Choice**: Supervised learning from a curated dataset of human and simulated games.
 -   **Learning from Data**: Comparing NN predictions with the "best move" targets.
 -   **Human-Centric**: Trained on student moves to model human-like playstyles and complexity.
+
+---
+
+# Deep Learning
+
+![bg left:45% width:500px](Exploring%20Chessmaro%20AI%20Model_files/F1-03.large.jpg)
+
+-   Each problem is a mathematical function with many parameters. We try parameters and check if returns the appropiate Y for the X
+-   **Loss and Gradient Descent** We try to minimize Loss and we try better parameters in the way to descent.
+-   **Learning Rate**: If we learn too fast we can miss the minimum. 
+-   **Architecture**: We choose Convolutional Networks because chess has the same architecture as an image: 8x8 pixels of some color depth.
 
 ---
 
