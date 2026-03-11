@@ -5,6 +5,7 @@ services:
     ports:
       - "7860:7860"
       - "8000:8000"
+      - "8443:8443"
     restart: unless-stopped
     environment:
       - PYTHONUNBUFFERED=1

@@ -14,6 +14,8 @@ import os
 import psutil
 import time
 import chess
+import subprocess
+from pathlib import Path
 #from mcts_worker import mcts_worker
 #from gradio_app import launch_gradio
 
@@ -185,7 +187,61 @@ def main():
 
     # Start the FastAPI server
     api_app = create_api(task_q, tasks_result_q)
-    uvicorn.run(api_app, host="0.0.0.0", port=8000)
+    cert_dir = Path(os.getenv("SSL_CERT_DIR", "certs"))
+    cert_file = cert_dir / os.getenv("SSL_CERT_FILE", "server.crt")
+    key_file = cert_dir / os.getenv("SSL_KEY_FILE", "server.key")
+
+    http_port = int(os.getenv("HTTP_PORT", "8000"))
+    https_port = int(os.getenv("HTTPS_PORT", "8443"))
+
+    ensure_self_signed_certificate(cert_file, key_file)
+    run_http_and_https(api_app, http_port, https_port, cert_file, key_file)
+
+
+def ensure_self_signed_certificate(cert_file: Path, key_file: Path):
+    if cert_file.exists() and key_file.exists():
+        print(f"🔐 Certificado existente: {cert_file} / {key_file}")
+        return
+
+    cert_file.parent.mkdir(parents=True, exist_ok=True)
+
+    cmd = [
+        "openssl", "req", "-x509", "-nodes", "-newkey", "rsa:2048",
+        "-keyout", str(key_file),
+        "-out", str(cert_file),
+        "-days", "365",
+        "-subj", "/C=ES/ST=Valencia/L=Valencia/O=ChessAIThon/CN=localhost",
+    ]
+
+    try:
+        subprocess.run(cmd, check=True, capture_output=True, text=True)
+        print(f"✅ Certificado autofirmado generado en {cert_file}")
+    except FileNotFoundError as exc:
+        raise RuntimeError(
+            "No se encontró 'openssl'. Instálalo para generar certificados autofirmados."
+        ) from exc
+    except subprocess.CalledProcessError as exc:
+        raise RuntimeError(
+            f"Error generando certificado autofirmado: {exc.stderr.strip() or exc}"
+        ) from exc
+
+
+def run_http_and_https(api_app, http_port: int, https_port: int, cert_file: Path, key_file: Path):
+    def run_http():
+        uvicorn.run(api_app, host="0.0.0.0", port=http_port)
+
+    http_thread = threading.Thread(target=run_http, daemon=True)
+    http_thread.start()
+    print(f"🌐 HTTP activo en http://0.0.0.0:{http_port}")
+
+    print(f"🔒 HTTPS activo en https://0.0.0.0:{https_port}")
+    uvicorn.run(
+        api_app,
+        host="0.0.0.0",
+        port=https_port,
+        ssl_certfile=str(cert_file),
+        ssl_keyfile=str(key_file),
+    )
 
 
 

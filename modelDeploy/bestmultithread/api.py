@@ -14,7 +14,7 @@ def create_api(task_q, tasks_result_q):
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # en producción pon tu dominio
+        allow_origins=["*"],  
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
