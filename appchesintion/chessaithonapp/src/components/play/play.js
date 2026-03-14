@@ -21,6 +21,77 @@ class PlayComponent extends HTMLElement {
 
         //Board
         const board = document.createElement("chess-board");
+        const gameStatus = this.querySelector("#gameStatus");
+
+        const parseFenMeta = (fen) => {
+            if (!fen || typeof fen !== "string") {
+                return null;
+            }
+
+            const [position, activeColor, castling, enPassant, halfmove, fullmove] = fen.split(" ");
+            if (!position || !activeColor) {
+                return null;
+            }
+
+            const turnPiece = activeColor === "w" ? "♙" : "♟";
+            const turnClass = activeColor === "w" ? "turn-white" : "turn-black";
+            const castlingLabel = castling && castling !== "-" ? castling : "—";
+
+            return {
+                turnPiece,
+                turnClass,
+                castlingLabel,
+                enPassant: enPassant || "-",
+                halfmove: halfmove || "0",
+                fullmove: fullmove || "1"
+            };
+        };
+
+        const renderStatusHtml = (gs) => {
+            const fenMeta = parseFenMeta(gs?.fen);
+            if (!fenMeta) {
+                return "";
+            }
+
+            let stateText = "Playing";
+            let stateClass = "status-chip status-running";
+
+            if (gs.ended) {
+                if (gs.endReason === "checkmate") {
+                    const winner = gs.winner === "white" ? "♙" : "♟";
+                    stateText = `Mate ${winner}`;
+                    stateClass = "status-chip status-checkmate";
+                } else if (gs.endReason === "stalemate") {
+                    stateText = "Stalemate";
+                    stateClass = "status-chip status-draw";
+                } else {
+                    stateText = "Draw";
+                    stateClass = "status-chip status-draw";
+                }
+            } else if (gs.inCheck) {
+                const checkedSide = gs.currentPlayer === "w" ? "♙" : "♟";
+                stateText = `Check ${checkedSide}`;
+                stateClass = "status-chip status-check";
+            }
+
+            return `
+                <span class="status-table">
+                    <span class="status-head">State</span>
+                    <span class="status-head">Turn</span>
+                    <span class="status-head">Castling</span>
+                    <span class="status-head">En Passant</span>
+                    <span class="status-head">Half</span>
+                    <span class="status-head">Full</span>
+
+                    <span class="${stateClass} status-cell status-state">${stateText}</span>
+                    <span class="status-chip status-cell status-turn ${fenMeta.turnClass}" title="Turn">${fenMeta.turnPiece}</span>
+                    <span class="status-chip status-cell status-meta">${fenMeta.castlingLabel}</span>
+                    <span class="status-chip status-cell status-meta">${fenMeta.enPassant}</span>
+                    <span class="status-chip status-cell status-meta">${fenMeta.halfmove}</span>
+                    <span class="status-chip status-cell status-meta">${fenMeta.fullmove}</span>
+                </span>
+            `;
+        };
 
         this.state.state$.subscribe(gs => {
             board.state.movesHistory.next([...board.state.movesHistory.getValue(),
@@ -33,6 +104,10 @@ class PlayComponent extends HTMLElement {
             board.state.displayFen.next(gs.fen);
             board.state.currentTurn.next(gs.currentPlayer);
             board.state.suggestedMoves.next(gs.suggestedMoves || []);
+
+            if (gameStatus) {
+                gameStatus.innerHTML = renderStatusHtml(gs);
+            }
             //console.log(gs.fen , board.state.movesHistory.getValue());
             
         });

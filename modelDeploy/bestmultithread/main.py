@@ -122,6 +122,8 @@ def task_listener(task_q, mcts_result_q, batcher_q, tasks_result_q, worker_respo
             # 5. Imprimir Alternatives (Visitas)
             if alternatives:
                 max_v = max(v for _, v in alternatives)
+                if max_v == 0:
+                    max_v = 1  # Evitar división por cero
                 formatted_alts = []
                 for move, visits in alternatives:
                     ratio = visits / max_v
