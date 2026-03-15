@@ -10,7 +10,6 @@ To build a GPU-enabled Docker setup, we include the standard files: `requirement
 
 The container exposes both a Gradio API and a web interface through `app.py`.
 
-For quick local testing, you can simply run `predict.py`.
 
 ## Montecarlo Tree Search
 
@@ -229,30 +228,12 @@ When introducing multiple threads exploring the same tree, there is a risk that 
 * **Virtual Loss:** A fundamental technique that temporarily penalizes a node's score while it is being evaluated by a thread. This "disincentivizes" other threads, forcing them to explore alternative nodes and ensuring effective parallel expansion of the tree.
 * **Concurrency Management:** The need for granular locks (`Locks`) was discussed to protect the integrity of node data (visits, value) without stalling chess logic or inference execution.
 
-### 4. Consolidation of Results
-
-The final phase of the algorithm translates the individual intelligence of each worker into a single global decision.
-
-* **Aggregation by Visits:** Academically, summing the visits from all processes is more robust than averaging their values. By consolidating search statistics from all 24 processes, the statistical "consensus" acts as a filter against neural network evaluation errors.
 
 
-## ChessAIthon vs Stockfish
+## ChessAIthon analised
 
-The behavior of a **Monte Carlo Tree Search (MCTS) system guided by a neural network** applied to chess was analyzed, systematically comparing its decisions with those of Stockfish and studying the effect of the number of simulations on the quality of the selected moves.
-
-Empirical analysis of complete games showed that, in a significant proportion of positions, the move ultimately chosen by the MCTS coincides with the move initially prioritized by the neural network. Although this initial policy has limited accuracy (around 25% depending on the training), the MCTS fails to consistently reverse these preferences when the network makes mistakes, even when increasing the number of simulations from 200 to 4000. This phenomenon was clearly observed in direct comparisons between three columns: Stockfish, MCTS with few simulations, and MCTS with many simulations.
-
-Detailed analysis of specific positions, especially endgames, revealed that the system tends to consider as very bad moves that Stockfish identifies as optimal or necessary to prolong resistance. This was explained by the weakness of the evaluation function used: a heuristic based primarily on material balance, simply normalized, which produces values ​​close to zero for many strategically very different positions. As a result, multiple leaves of the tree return similar evaluations, drastically reducing the MCTS's ability to discriminate between alternatives.
-
-From an algorithmic perspective, it was concluded that the MCTS is dominated by the network's initial policy. The search process focuses early on moves with the highest preprobability, and the evaluation is not informative enough to quickly penalize incorrect moves. In this context, the search term (PUCT) amplifies the network's initial preferences instead of correcting them, which explains the small difference between running few or many simulations.
-
-The implicit comparison with AlphaZero clarified this limitation. Unlike the analyzed system, AlphaZero relies on a trained value function to predict the final game outcome, allowing suboptimal moves to be quickly discarded during the search. Furthermore, it uses softer policies and explicit search mechanisms, preventing the search from becoming prematurely anchored to initial preferences.
-
-The main conclusion is that the system has reached the information limit of its current evaluation function. The MCTS operates stably and consistently, and the neural network effectively influences decisions, but the search cannot substantially improve the quality of moves without a richer value signal. Consequently, increasing the number of simulations does not produce appreciable improvements except in positions where several moves are approximately equivalent.
 
 In general terms, the analysis confirms a fundamental principle: the MCTS does not generate knowledge on its own, but rather amplifies the quality of the policy and the evaluation it receives. To overcome the observed limitations, it would be necessary to introduce a learned value function, reduce the excessive dependence on the initial policy, or explicitly strengthen the exploration mechanisms, especially in endgames.
-
-Below is a structured, academic summary of the entire discussion, focused exclusively on the strategic and conceptual ideas, not on specific technical errors or bugs.
 
 
 ### 1. Fundamental Difference Between Classical MCTS and AlphaZero-Style MCTS
@@ -281,24 +262,23 @@ The goal is not to simulate complete games, but to **build a probability distrib
 ### 2. Main Bottleneck: Neural Network Inference
 
 * Calling a CNN at each step of the playout destroys performance.
-* AlphaZero avoids this:
-* One inference **per expanded node**, not per simulated move.
+* How to avoid this:
+  * One inference **per expanded node**, not per simulated move.
 * The performance of modern MCTS depends more on:
-* prior quality
-* correct value propagation
-* exploration/exploitation balance
+  * prior quality
+  * correct value propagation
+  * exploration/exploitation balance
 
 **Correct Strategy:**
 Reduce inferences and increase selection quality (PUCT).
-
 
 ### 3. Using PUCT instead of Classical UCT
 
 The strategic formula used is:
 
-```text
-  PUCT(s,a) = Q(s,a) + c_{puct} \cdot P(s,a)\frac{\sqrt{N(s)}}{1 + N(s,a)}
-```
+$$
+\mathrm{PUCT}(s,a) = Q(s,a) + c_{\mathrm{puct}} \cdot P(s,a) \frac{\sqrt{N(s)}}{1 + N(s,a)}
+$$
 
 * `Q`: average learned value
 * `P`: network prior (or equivalent heuristic)
@@ -312,7 +292,7 @@ Exploration is not uniform; promising moves are prioritized based on prior knowl
 
 * Value should always be interpreted from the perspective of the player who moves.
 * In backpropagation:
-* the sign of the value is reversed at each level of the tree.
+  * the sign of the value is reversed at each level of the tree.
 * This eliminates the need to explicitly distinguish between max and min.
 
 **Strategic Principle:**
@@ -323,10 +303,10 @@ A single scalar value is sufficient if turn alternation is handled correctly.
 
 There is no universal fixed number.
 * AlphaZero Engines:
-* 800–1600 simulations per move (chess)
+  * 800–1600 simulations per move (chess)
 * Lightweight Projects:
-* 100–400 → reasonable decisions
-* 1000+ → strategic structure begins to emerge
+  * 100–400 → reasonable decisions
+  * 1000+ → strategic structure begins to emerge
 
 **Key Idea:**
 The quality of the prior is more important than the raw number of simulations.
@@ -352,8 +332,8 @@ In openings and early middlegames:
 
 * Produces a **probability distribution**
 * The best move is defined by:
-* number of visits
-* not necessarily the highest immediate value
+  * number of visits
+  * not necessarily the highest immediate value
 
 **Strategic Implication:**
 Comparing engines requires looking at more than just the “best move”.
@@ -366,13 +346,31 @@ For the comparison to be scientifically valid:
 * Same time per move
 * Non-trivial positions (no immediate checkmates)
 * Metrics:
-* match with Stockfish's top-N
-* stability of choice
-* strategic consistency
+  * match with Stockfish's top-N
+  * stability of choice
+  * strategic consistency
 
 **Central idea:**
 The goal is not to "beat Stockfish," but to **validate the quality of guided search**.
 
+### 9. The "Virtual Loss" and Parallelization
+
+In high-performance MCTS, you don't run simulations one by one; you run them in batches to saturate the GPU. However, if multiple threads explore the same path simultaneously, they won't "know" others are there, leading to redundant work.
+
+* **The Concept:** When a thread starts exploring a node, it applies a **Virtual Loss**.
+* **The Effect:** It temporarily artificially lowers the $Q$-value of that node, discouraging other threads from following the same path until the first thread returns with a real evaluation from the Neural Network.
+* **Strategic Benefit:** This ensures **diverse exploration** across the tree even during high-speed parallel inference.
+
+### 10. Dirichlet Noise: The "Creative" Spark
+
+A common failure in AlphaZero-style engines is getting stuck in a "local optimum"—where the Policy ($P$) is so convinced a move is good that it ignores better, subtler alternatives.
+
+* **Mechanism:** At the root node, we inject **Dirichlet Noise** into the prior probabilities:
+
+$$P(s, a) = (1 - \epsilon)P_a + \epsilon \cdot \eta_a$$
+
+where $\eta$ is the noise sampled from a Dirichlet distribution.
+* **Purpose:** This forces the engine to spend at least some simulations on "unlikely" moves. This is how engines discover novel opening theoretical improvements that classical engines might prune too early.
 
 ### General Conclusion
 
@@ -384,13 +382,13 @@ The strategy followed in this project is consistent with the modern philosophy o
 * real-time benchmarks
 
 
-# **ChessAIThon – Deployment Manual (Docker + NVIDIA GPU Support)**
+## **ChessAIThon – Deployment Manual (Docker + NVIDIA GPU Support)**
 
 This guide explains how to deploy the *ChessAIThon* model on an Ubuntu system using Docker, Docker Compose, and the NVIDIA Container Toolkit for GPU acceleration.
 
 ---
 
-## **1. Update System and Install Required Packages**
+### **1. Update System and Install Required Packages**
 
 Update package lists and install certificates + curl:
 
@@ -401,7 +399,7 @@ sudo apt install ca-certificates curl
 
 ---
 
-## **2. Add Docker’s Official GPG Key and Repository**
+### **2. Add Docker’s Official GPG Key and Repository**
 
 Create directory for Docker’s keyrings:
 
@@ -436,7 +434,7 @@ sudo apt update
 
 ---
 
-## **3. Install Docker Engine and Plugins**
+### **3. Install Docker Engine and Plugins**
 
 ```bash
 sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
@@ -456,7 +454,7 @@ docker compose
 
 ---
 
-# **4. Clone the ChessAIThon Repository**
+### **4. Clone the ChessAIThon Repository**
 
 ```bash
 git clone https://github.com/xxjcaxx/ChessAIThon.git
@@ -473,7 +471,7 @@ ls
 
 ---
 
-## **5. Install NVIDIA Drivers (for GPU Support)**
+### **5. Install NVIDIA Drivers (for GPU Support)**
 
 Check for NVIDIA GPU:
 
@@ -501,7 +499,7 @@ nvidia-smi
 
 ---
 
-## **6. Place the Trained Model in the Deployment Folder**
+### **6. Place the Trained Model in the Deployment Folder**
 
 Move your trained model file into *modelDeploy/*:
 
@@ -513,7 +511,7 @@ ls
 
 ---
 
-## **7. (Initial Attempt) Start Docker Compose**
+### **7. (Initial Attempt) Start Docker Compose**
 
 ```bash
 sudo docker compose up -d
@@ -524,7 +522,7 @@ If the container fails due to missing GPU runtime, continue with the next sectio
 
 ---
 
-## **8. Install NVIDIA Container Toolkit (GPU Support for Docker)**
+### **8. Install NVIDIA Container Toolkit (GPU Support for Docker)**
 
 Add NVIDIA GPG key:
 
@@ -574,7 +572,7 @@ sudo docker run --rm --gpus all nvidia/cuda:12.3.0-base nvidia-smi
 
 ---
 
-## **9. Start the ChessAIThon Deployment with GPU Support**
+### **9. Start the ChessAIThon Deployment with GPU Support**
 
 Navigate to the deployment directory:
 

@@ -18,6 +18,7 @@ const sidebars = {
   // Manual sidebar for ChessAIthon documentation
   tutorialSidebar: [
     'intro',
+    'pedagogical_manual',
 
     {
       type: 'category',

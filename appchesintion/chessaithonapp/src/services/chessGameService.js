@@ -91,6 +91,15 @@ export class GameState {
       suggestOnly: false
     };
   }
+
+  stop() {
+    this.aiStopped = true;
+  }
+
+  resume() {
+    this.aiStopped = false;
+  }
+
   set move(uci) {
     try {
       this.game.move(uci);
@@ -122,6 +131,10 @@ export class GameState {
         simulations: this.settings?.simulations || 400,
         puct: this.settings?.puct || 1.0
       }).then(m => {
+        if (this.aiStopped) {
+          return;
+        }
+
         if (this.settings?.suggestOnly) {
           const alternatives = Array.isArray(m?.alternatives) ? m.alternatives : [];
           const topFive = [m?.move, ...alternatives.map(a => a?.[0])]
@@ -139,7 +152,11 @@ export class GameState {
 
         const aiMove = forceQueenPromotionIfNeeded(this.game, m?.move);
         this.move = aiMove;
-      }).catch(err => console.error('AI request failed', err));
+      }).catch(err => {
+        if (!this.aiStopped) {
+          console.error('AI request failed', err);
+        }
+      });
 
     }
   }

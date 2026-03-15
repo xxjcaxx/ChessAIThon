@@ -4,16 +4,16 @@ Chess is a great example for learning AI model creation because it has well-defi
 
 We are developing an AI model to determine the best next move in a given chess position, focusing on deep learning methods that have proven competitive against traditional stochastic algorithms. In concrete we are going to make a generic CNN for chess that:
 
-* Will be able to play with white or black moves.
+* Will be able to play with only white moves. Black moves will be predicted by invert the board.
 * Will be able to play at any point of the game. But:
   * There will be more similar starts (logicaly) and we will have special care in mates, so we will put part of our mates database.
-* Will predict a legal move before testing
+* Will predict a legal move before testing.
 * Will improve as we can the CNN and hyperparameters.
 
 To develop a chess-playing AI, we can explore several strategies:
 
 1. **Neural Network Learning from Historical Data:**
-   * Utilize a neural network trained on a database of chess moves to predict optimal plays based on a given board position. The network takes the current board state as input and selects a move. This move is then compared with the best move from historical examples, and the accuracy is calculated to adjust the neural network for the next example. To enhance this approach, include legal moves as part of the input and properly encode the output in a format compatible with these legal moves. Finally, filter the network's selected moves using a mask to retain only legal ones and choose the best among them.
+   * Utilize a neural network trained on a database of chess moves to predict optimal plays based on a given board position. The network takes the current board state as input and selects a move. This move is then compared with the best move from historical examples, and the accuracy is calculated to adjust the neural network for the next example. To enhance this approach, include legal moves as part of the input and properly encode the output in a format compatible with these legal moves. 
 
 2. **Competing Against Another Chess AI (e.g., Stockfish):**
    * Engage the neural network in competition against another AI, such as Stockfish. Each decision made by the neural network is scored based on its success. Subsequently, retrain the network using these scores and pit it against the opponent again. Success can be measured by either winning the game or evaluating its moves using a scoring algorithm like Stockfish's.
@@ -25,7 +25,7 @@ Our choice is the firts one for two principal reasons:
 * Can be used with human samples and used in a VET competition using datasets made by students.
 * Is "cheap" in tems of required machine and time to train. 
 
-## Lectures
+*** Lectures ***
 
 * https://www.freecodecamp.org/news/create-a-self-playing-ai-chess-engine-from-scratch/
 * http://cs230.stanford.edu/projects_winter_2019/reports/15808948.pdf
@@ -76,10 +76,11 @@ We need to figure out how to **represent the chessboard** and the **best predict
 
 On top of that, we must make sure the moves the AI suggests are **valid**, meaning they follow the rules of chess, and also check if they are actually **good moves**.
 
-# Preparing the data
+## Preparing the data
 
 We can represent a chess game in varios formats: FEN, FEN moves, SAN moves, UCI moves... and with matrix. Each piece has a letter and we can make a matrix like this:
 
+```
        +------------------------+
      8 | r  n  b  q  k  b  n  r |
      7 | p  p  p  p  .  p  p  p |
@@ -91,6 +92,8 @@ We can represent a chess game in varios formats: FEN, FEN moves, SAN moves, UCI 
      1 | R  N  B  Q  K  B  N  R |
        +------------------------+
          a  b  c  d  e  f  g  h'
+
+ ```        
 
 To train a **Convolutional Neural Network (CNN)** to predict chess moves, we need to represent the chessboard in a way the AI can understand.
 
@@ -139,6 +142,7 @@ Each matrix is **filled with 1s and 0s**. This way, all pieces are treated **equ
 * It prevents the AI from making mistakes based on number size.
 * It improves **move predictions** by focusing on piece **positions**, not their values.
 
+```
        [[[0., 0., 0., 0., 0., 0., 0., 0.],
          [0., 0., 0., 0., 0., 0., 0., 0.],
          [0., 0., 0., 0., 0., 0., 0., 0.],
@@ -157,14 +161,13 @@ Each matrix is **filled with 1s and 0s**. This way, all pieces are treated **equ
          [0., 0., 0., 0., 0., 0., 0., 0.],
          [0., 0., 0., 0., 0., 0., 0., 0.]],
          ...
+```
 
 This format is inspired in Alphazero way to code data. Alphazero does it more complex, but it has information about previous moves. But in theory, getting the best move is not related to historic data. Leela zero uses similar aproach.
 
-## Preparing Moves
-
 We don't just look at the chessboard; our representation also **tracks all possible moves** for each piece. It does this using a **multi-channel matrix**, meaning there are many **separate layers** of information about potential moves. Representing **all possible legal moves** for every piece in a game position. This means the AI will not only know where pieces are but also where they **can go**, making it smarter in predicting the best move.
 
-## Format of the data
+### Format of the data
 
 When training a chess AI, we need to store **a lot of chess games** in a way that the computer can understand. However, if we don’t use a smart format, the data can become **too large** and slow down the training process.
 
@@ -294,11 +297,36 @@ codes[(-2,1)], i = i,  i+1
 codes[(-1,2)], i = i,  i+1
 ```
 
-By using this matrix structure:
 
-1. The AI can **easily learn** the movement patterns of each piece.
-2. It can identify which positions are valid moves for a **Queen** or a **Knight** at any given point on the board.
-3. The matrix format is easy to process and allows the AI to quickly determine all possible moves for any piece at any time.
+
+### Why this structure?
+
+Instead of a single numerical matrix, we represent the board state using a **$77 \times 8 \times 8$ tensor**. This is composed of:
+
+* **12 Piece Matrices:** One for each piece type (Pawn, Knight, Bishop, Rook, Queen, King) per color (White/Black).
+* **1 Turn Matrix:** A constant layer indicating whose turn it is.
+* **64 Movement Matrices:** Encoding all potential legal moves for the current board state.
+
+Representing the board as specialized layers is advantageous for a **Convolutional Neural Network (CNN)** for several reasons:
+
+* **Spatial Hierarchies:** Since chess is inherently an $8 \times 8$ grid, CNNs excel at detecting **spatial patterns** (like pin formations, battery attacks, or king safety) that are preserved by this structure.
+* **Efficient Feature Extraction:** Separate matrices allow the model to learn the unique "identity" and tactical value of each piece independently before combining them into higher-level strategic concepts in deeper layers.
+* **Data Alignment:** Aligning the input directly with the physical layout of the board makes the model's decisions more interpretable and simplifies the ETL (Extract, Transform, Load) process.
+
+#### Understanding Movement Matrices: The "Heat Map" Analogy
+
+To help the AI "visualize" its options, we treat legal moves as image data. Think of each move matrix as a **grid of pixels**:
+
+* **1 (On):** A legal move is possible from/to that square.
+* **0 (Off):** No move is possible.
+
+A position becomes **"hot"** when the AI detects a high density of 1s in these matrices. For example, a Queen in the center generates a "hotter" movement signature than a trapped Knight. This serves as a **Boolean Mask**, ensuring the model prioritizes legal, high-value moves during the training and inference phases.
+
+Our architecture, **ChessMarro**, optimizes for resource efficiency by simplifying the input space:
+
+* **No Historical Data:** Unlike AlphaZero, which uses $k$-previous moves, we focus on the current state. This significantly reduces RAM, disk space, and GPU overhead.
+* **Simplified State:** We omit complex tracking (castling rights, repetition) to prioritize a "lighter" model that maintains strong "intuition" (Top-1 accuracy) without the need for massive computational clusters.
+
 
 **Thinking of the Matrix Like a Pixel in an Image**
 
@@ -321,51 +349,8 @@ The idea of a **"hot" position** means that the piece is very active or has a lo
 * The position where the piece is located (like the Queen’s starting position) will have **more 1s** around it, because the piece can move to more squares.
 * The AI will notice that these positions are important because the piece has **more options**, and that makes the position **"hotter"**.
 
-For example:
 
-* If the **Queen** is at the center of the board, the matrix around it will be **"hotter"** because the Queen can move in many directions. The AI will recognize that this position is important.
-* A piece with fewer moves will have fewer **1s** around it, making its position **"colder"** in the matrix.
-
-Now that the AI sees these patterns, it can:
-
-* **Understand the game**: The AI can recognize where each piece is and how many squares it can move to. The more **1s** in the matrix, the more powerful the piece is in that position.
-* **Make better decisions**: When the AI is trying to choose the best move, it looks for the **"hottest"** positions (where there are lots of **1s**) because those are the most valuable moves. It knows that those positions give it more **options** for winning the game.
-
-It’s like the AI is looking at a **map of possible moves** for each piece, and it can use this to play smarter chess.
-
-**Example**
-
-So if we have a White Queen like this:
-
-The queen can do lots of moves to: c7, c8, d7, e8, d6, e6, f6, d5, e4, f3, g2, c5, b5, a4, b6, b7, a8. We can take all this moves and interpret that, for example, the c6c7 move is 1 position to North, so the 12(board)+0*7(direction displacement)+1(squares quantity) = 13 matrix will have a 1 in the c6 current position of the queen.
-
-If we take the c6g2 move of the queen, the 12 + 3*7 (SE) + 4 (square qty) = 37. This matrix will have a 1 in the c6 ([2][2]) that is the current position of the queen.
-
-In summary, the 64 channels capture the possible moves for each of the 64 positions on the chessboard, covering various directions and types of moves for each piece. This representation is designed to provide comprehensive information about the legal moves associated with each piece and its position on the chessboard.
-
-> There is a fundamental difference with Alphazero. Alphazero stores last k moves in k*14 layers more. We are going to use 12 + 1 + 64 matrix. We will avoid historical information to make a more "simple" game where we don't know repetitions, castling or pawn promotes. It will save us many layers, disk space, CNN layers, RAM and GPU time.
-
-> Our strategy is to feed the CNN with game status and possible moves. These 2 different data can reinforce learning during CNN phase. We can, also, use the 64x8x8 possible moves matrix as a "Boolean Mask" to avoid illegal moves during forward phase and to train only with legal and the best move. If we avoid to enter this legal moves in the CNN, we can spare 64 layers and have only a 13 layer input.
-
-### Why this structure?
-
-Representing a chessboard as 12 matrices, each capturing the positions of different types and colors of pieces, is advantageous for a Convolutional Neural Network (CNN) due to the nature of the information being processed. Here are some reasons why this representation might be preferred over a single matrix of numerical values for a CNN:
-
-1. **Hierarchical Features:** The individual matrices for each piece type allow the CNN to learn hierarchical features. Each matrix can represent a specific piece (e.g., pawn, knight) and its position, enabling the network to focus on learning distinctive features for each type separately.
-
-2. **Spatial Information:** Having separate matrices for different pieces helps preserve the spatial information of the board. This is crucial for chess, where the positions and movements of pieces relative to each other are essential for understanding the game state.
-
-3. **Learning Discriminative Features:** CNNs are effective at learning hierarchical and discriminative features from images. By representing the chessboard as separate matrices, the network can learn to recognize unique patterns associated with each piece, contributing to better feature extraction.
-
-4. **Flexibility:** The modular representation of the board provides flexibility in adapting to changes in the game state. Adding or removing a piece corresponds to modifying a specific matrix, making it easier for the network to adapt to variations in the board configuration.
-
-5. **Interpretability:** The 12 matrices provide a more interpretable representation. Each matrix corresponds to a specific aspect of the game, making it easier to understand what features the network is focusing on during the learning process.
-
-Using 64 matrices of size 8x8 to represent all possible moves for any piece on a given chessboard can be useful for training a neural network due to its ability to capture spatial relationships and patterns. Each 8x8 matrix corresponds to a potential move, and the presence of a '1' at a specific position in a matrix signifies the location of the piece that can make that particular move.
-
-Here are some key points explaining the utility of this representation, all the previous arguments plus **Alignment with Board Representation:** Since chess boards are inherently represented as 8x8 grids, using matrices of the same size naturally aligns with the board's structure. This makes it easier for the network to relate its learned features to the actual layout of the chessboard.
-
-## Best move representation
+### Best move representation
 
 Lets talk about best move representation:
 
@@ -423,7 +408,7 @@ def number_to_uci(number_move):
 As we can see, it uses `codes`, the previous dictionary of moves.
 
 
-# Training in a notebook
+## Training in a notebook
 
 
 > Here we only are going to see the important code, but in the notebook there are all the code necessary to train and test our model
@@ -431,7 +416,7 @@ As we can see, it uses `codes`, the previous dictionary of moves.
 As all AI projects in Python, we need to import lots of libraries. These are the most common: numpy for numerical jobs, pandas to data management and parquet for data loading and storage.
 We need to install python-chess and ipython to code chess scenarios and to improve feeback in this notebook.
 
-## Reading the data
+### Reading the data
 
 To read the data we need a function to transform the parquet files in dataframes:
 
@@ -521,7 +506,7 @@ This function **prepares the chess game data** so that it can be fed into the AI
 In simple terms, this function prepares the chess data, splits it into training and testing sets, and organizes it into a format that the AI model can understand and learn from.
 
 
-## The CNN model Architecture
+### The CNN model Architecture
 
 When building a **Convolutional Neural Network (CNN)** for chess, we need to define how the AI learns from the data. This part is important because the network’s structure (how many layers, neurons, and connections it has) will determine how well the AI performs. 
 
@@ -537,7 +522,7 @@ The goal here is to build a network that is strong enough to understand chess, b
 Convolutional, Normalization, and Fully Connected layers are the essential building blocks in Deep Learning architectures. Each type of layer plays a critical role in data processing and learning, especially when applied to structured data like a chess board in a **Convolutional Neural Network (CNN)**.
 
 
-### 1. Convolutional Layers
+#### 1. Convolutional Layers
 
 * **Primary Purpose:** To learn **spatial and hierarchical patterns** from the input data. They are fundamental for processing data with a grid-like topology, such as images or, in our case, the 8x8 chess board representation.
 * **Key Function:** They apply a set of small **filters (kernels)** to local regions (*receptive fields*) of the input. This operation generates **feature maps** that highlight learned patterns (e.g., edges, textures, or specific piece threats in a chess position).
@@ -545,7 +530,7 @@ Convolutional, Normalization, and Fully Connected layers are the essential build
 * **Relevance to AI Chess:** Crucial for translating the board state into an abstract understanding of **strategic patterns** (e.g., pawn structures, king safety, or lines of attack/defense).
 
 
-### 2. Normalization Layers
+#### 2. Normalization Layers
 
 * **Primary Purpose:** To significantly **stabilize and accelerate training** by mitigating the **Internal Covariate Shift** phenomenon.
 * **Key Function:** These layers adjust the input to each subsequent layer so that it has a mean close to **zero** and a standard deviation close to **one**. This standardization ensures that gradients flow efficiently throughout the deep network.
@@ -555,7 +540,7 @@ Convolutional, Normalization, and Fully Connected layers are the essential build
 * **Relevance to AI Chess:** Essential for training deeper models like the `ChessNet` mentioned in the project files, allowing for higher learning rates and reducing dependency on precise weight initialization.
 
 
-### 3. Fully Connected Layers (*Dense Layers*)
+#### 3. Fully Connected Layers (*Dense Layers*)
 
 * **Primary Purpose:** To capture **high-level, non-spatial relationships** and perform the final linear transformation of the learned features.
 * **Key Function:** Every neuron in this layer is connected to every neuron in the preceding layer. They take the abstract feature maps learned by the convolutions and map them to the **final output** format required for the problem.
@@ -670,110 +655,69 @@ class ChessNetPV_Optimized(nn.Module):
         return policy, value
 ```
 
-The ChessNetPV architecture represents a contemporary implementation of a dual neural network for chess, designed under the principles of reinforcement learning and Monte Carlo tree search (MCTS) that were popularized by systems such as AlphaZero and Leela Chess Zero.1This structure is based on a residual convolutional body responsible for the extraction of spatial features and two heads dedicated to the prediction of policy (probability distribution on legal moves) and value (scalar evaluation of position).1The following section presents a comprehensive examination of its learning capabilities, its parametric bottlenecks, and the architectural optimization strategies needed to maximize its playing strength without compromising computational efficiency.
+The **`ChessNetPV_Optimized`** architecture represents a contemporary implementation of a dual neural network for chess. It is designed under the principles of reinforcement learning and Monte Carlo Tree Search (MCTS) popularized by **AlphaZero** and **Leela Chess Zero (Lc0)**.
 
-The ChessNetPV architecture uses a 77-bit-layer input. In the design of neural networks for board games, the quality of the input representation determines the upper limit of the model's generalization capacity.5A 77-layer system suggests a coding that includes the location of the pieces (12 planes), castling information, turn, and possibly a history of previous moves to capture the dynamics of the position and the triple repetition rule.1In comparison, AlphaZero uses 119 planes, most of which correspond to the history of the last eight positions, allowing the network to identify temporal patterns such as pressure building up on a flank or the exhaustion of a piece's mobility.
-The ChessNetPV network body deviates from the industry standard by employing aggressive channel expansion instead of a constant depth rook.9While AlphaZero maintains 256 filters across 20 or 40 residual blocks, ChessNetPV doubles the number of channels at each stage, culminating in 1024 channels in its fourth convolutional layer.
+The model consists of a **Residual Convolutional Tower** responsible for spatial feature extraction and two specialized **Heads** for policy and value prediction. This optimized version specifically addresses the "parametric bottleneck" and "gradient flow" issues common in earlier iterations.
 
-The strategy of increasing network width (channels) improves the network's ability to represent a greater variety of features at a single point on the board. However, in chess, the complexity of the game often lies in long-range relationships that can only be captured through depth (layers).7Each convolutional layer with a 3x3 kernel expands the network's receptive field linearly. With only four layers, ChessNetPV's receptive field is limited, making it difficult to integrate information between distant squares, such as coordinating a rook on a1 and a bishop on h8.7
+Our model utilizes a **77-layer input representation**. In deep learning for board games, the quality of the input determines the upper limit of the model's generalization.
 
-| Architectural Attribute | ChessNetPV (Original) | AlphaZero | Leela Chess Zero (T78) |
-| :---- | :---- | :---- | :---- |
-| Convolutional Layers | 4 | 40+ | 80+ |
-| Maximum Channels | 1024 | 256 | 512 |
-| Tower Structure | Expansive | Constant | Constant (SE-ResNet) |
-| Receptive Field | Moderate | Full | Complete (with attention) |
-
-Research on architectures such as KataGo and Leela Chess Zero indicates that it is preferable to use a moderate number of channels (e.g., 192 or 256\) but with a larger number of residual blocks to allow the network to perform multiple reasoning steps on the same position.9Each additional block allows the squares to "converse" with each other, refining the understanding of tactical concepts such as pins, discovered attacks, and king safety.4
-
-The inclusion of residual connections in ChessNetPV is a critical component to avoid gradient fading during deep network training.15However, using $1 \\times 1$ convolutions on the identity path (res\_conv2, res\_conv3, res\_conv4) to equalize the number of channels introduces a computational and parametric load that does not directly contribute to nonlinear feature extraction.11  
-In an ideal residual network, the learned function is $H(x) \= F(x) \+ x$. When $x$ and $F(x)$ have different dimensions, a linear transformation $W\_s x$ is applied to adjust the dimensions. Although ChessNetPV implements this correctly, the massive increase in channels to 1024 causes these $W\_s$ matrices to become extremely large, consuming GPU memory that could be used more effectively in the depth of the residual tower.18
-
-One of the most critical points of the current architecture is the fc1 layer. Flattening the output of conv4 generates an input vector of 1024 × 8 × 8 \= 65,536 elements. Connecting this to a hidden layer of 1024 neurons, the number of weights in this single layer is:
-
-$$65,536 \\times 1,024 \= 67,108,864$$  
-This volume of parameters in a single layer is problematic for three fundamental reasons:
-
-1. **Risk of Overfitting**The network has the ability to memorize specific positions from the training database instead of generalizing strategic principles.18  
-2. **Loss of Board Topology**By converting the feature map of $8 \\times 8$ into a flat vector before processing policy and value, the network loses its sense of spatial proximity in its final stages. The dense layer weights must laboriously relearn that cell e4 is close to d4, a relationship that convolutional layers naturally maintain.7 
-3. **Inference Latency**In real-time or deep search applications with MCTS, the time required to perform matrix multiplications of this size drastically reduces the number of nodes evaluated per second.
-
-The most significant improvement implemented in Leela Chess Zero was the transition from standard residual blocks to blocks with Squeeze-and-Excitation layers.9These blocks allow the network to perform selective attention on information channels, "exciting" the relevant planes and "squeezing" those containing noise for the current position.  
-The SE mechanism consists of two phases:
-
-* **Squeeze**A Global Average Pooling reduces each feature map of $8 \\times 8$ to a single scalar value, summarizing the global channel information.28  
-* **Excitation**A small bottleneck of dense layers (with a reduction factor of 16\) calculates a weight vector that is multiplied by the original map.29
-
-Mathematically, if `U` is the output of a convolution, the SE operation recalibrates each channel using a sigmoid gate and multiplies it by the original channel activation.
-
-In compact form: `u_tilde_c = sigmoid(g(z, W)) * u_c`.
-
-Where `z` is the compressed vector and `sigmoid` is the activation used for channel weighting. This addition increases the network's ability to discern abstract concepts, such as the relative importance of open diagonals versus closed columns, at minimal parametric cost.
-
-ChessNetPV uses ReLU, which is prone to the "dead neurons" problem during intensive reinforcement learning training.31The Mish activation function has proven superior in multiple chess engine tests, offering a smoother loss surface and better retention of small negative information.31  
-Mish is defined as $x \\cdot \\tanh(\\ln(1 \+ e^x))$. Being a non-monotonic function, it allows small gradients to flow even for negative values, making it easier for the network to escape local minima during MCTS training.9
-
-| Activation Function | Advantages in Chess | Disadvantages |
-| :---- | :---- | :---- |
-| resume | Computationally cheap, it induces scarcity. | Problem of dead neurons. |
-| Mish | Better generalization, smoother gradients. | Slightly more expensive to calculate. |
-| Swish | Similar behavior to Mish, used in mink. | Less adopted in chess engines. |
-
-The current ChessNetPV structure follows the convolution \-\> batchnorm \-\> activation pattern. A pre-activation architecture (where normalization and activation occur before convolution) has been shown to allow for a much cleaner flow of identity across the network.16This is vital in chess, where the signal from the original board must persist through many layers so that the network does not "forget" the exact location of a critical piece while processing abstract tactical concepts.15
-
-### Policy Header Evaluation and Movement Mapping
-
-The ChessNetPV policy header emits a vector of 4096 elements. This corresponds to a simplified mapping of 64 source squares to 64 destination squares (64 × 64 \= 4096). While functional, this approach is inefficient compared to AlphaZero's 8 × 8 × 73 planar scheme.1  
-In the AlphaZero system, the 73 planes encode the semantics of movement:
-
-* **56 plans**for queen-type movements (8 directions x 7 distances).6  
-* **8 plans**for horse movements.6  
-* **9 plans**for special promotions (rook, bishop, knight in three directions of capture/advance).6
-
-Using a flat output of 4096, the ChessNetPV network implicitly learns that a move from e2 to e4 is similar to a move from d2 to d4 (a two-square advance). In a convolutional representation of the policy, these moves would share the same "vertical advance" filters, significantly accelerating the learning of the game's rules and basic tactics.26Since the user wants to maintain the output of 4096, the improvement should focus on how that vector is reached from the intermediate convolutional layers.
-
-### Implementation of Bottlenecks in the Print Heads
-
-To solve the problem of 67 million parameters in fc1, a channel reduction convolution must be applied before flattening. Instead of going directly from 1024 channels to a linear layer, it is recommended to add a 1 × 1 convolutional layer that reduces the channels from 1024 to a small number, such as 32\.17  
-This change would transform the input of the dense layer:
-
-* **Before**$1024 ÷ 8 ÷ 8 \= 65,536$ entries.  
-* **After**$32 ÷ 8 ÷ 8 \= 2,048 entries.
-
-By reducing the input from 65k to 2k, the number of weights in the first dense layer falls from 67 million to approximately 2 million.17This parametric "saving" allows the network's capacity to be redistributed towards the convolutional body, increasing the number of residual layers (depth) without exceeding the total memory budget or computing time.11
-
-### Value head
-
-The current value head predicts a single scalar using a tanh function. While this matches the required output, the training benefits from a richer internal signal. Modern engines like Lc0 often train a value head that independently predicts the probabilities of win ($W$), draw ($D$), and lose ($L$) (WDL head).9  
-The benefit of the WDL approach is that it allows the network to distinguish between dry positions (high probability of a draw) and chaotic positions with similar evaluations but higher risk. To maintain compatibility with ChessNetPV, the value $V \= P(W) \- P(L)$ can be calculated internally and returned as the single scalar required by the function signature.9
-
-| Value Header | Structure | Learning Signal |
-| :---- | :---- | :---- |
-| Escalar (ChessNetPV) | 1 exit (Tanh) | Poor (final result only). |
-| WDL (Proposed) | 3 outputs (Softmax) | Rich (includes probability of draws). |
-| MLH (Optional) | Estimate of remaining movements | Useful for endgames and checkmate speed. |
-
-Including a Dropout layer (0.4) in ChessNetPV is adequate to prevent overfitting in dense layers, but with the bottleneck reduction proposed above, the dropout value could be reduced to 0.2 or 0.3, as the network would have less tendency towards memorization and more towards robust feature extraction in the convolutional body.38
+* **State Encoding:** These 77 planes include piece positions (12 planes), the current turn, and strategic indicators.
+* **Comparison:** While AlphaZero uses 119 planes (including 8 historical moves), our 77-plane approach focuses on a more compact state to maximize computational efficiency on available hardware while still capturing the essential dynamics of the position.
 
 
-### Analisys
+To ensure deep learning without the risk of "vanishing gradients," the model employs a **Residual Tower** with a configurable number of blocks (defaulting to 6 or 12).
 
-The learning capacity of a chess network is manifested in its ability to overcome static material evaluation and understand positional compensation. With its current architecture, ChessNetPV has a limited "view" of only a few steps of interaction between pieces due to its shallow depth.7
+* **Pre-activation Architecture:** Unlike standard networks, our `ResBlock` applies **Batch Normalization** and **Activation** *before* the convolution. This allows a "cleaner" flow of identity through the network, helping the AI "remember" exact piece locations while simultaneously processing abstract tactical concepts in deeper layers.
+* **Mish Activation Function:** We have replaced the standard ReLU with **Mish** ($x \cdot \tanh(\text{softplus}(x))$).
+* **Why Mish?** ReLU can suffer from "dead neurons" during intensive training. Mish is non-monotonic and smoother, which helps the network escape local minima and retain small negative gradients, leading to better strategic generalization.
 
-For a neural network to understand a concept like the "bayonet attack" in the King's Indian Defense, it must integrate information from the entire board. A network with only four convolutional layers has an effective receptive field of approximately 9x9 squares in its outermost layer. While this covers the 8x8 board, information from opposite corners is only contained in a single final neuron, weakening the network's ability to coordinate attacks on both flanks simultaneously.
-Increasing the depth to a tower of 12-20 residual blocks of constant width (e.g., 256 filters) would ensure that each square on the board receives information from all other squares multiple times at each inference step.1This would allow the network to learn "double front" tactics and deep prophylaxis maneuvers, characteristics of grandmaster-level play.
+| Activation Function | Performance in ChessNet | Role in the Model |
+| --- | --- | --- |
+| **Mish (Current)** | Superior gradient flow and smoother loss surface. | Primary activation in all blocks. |
+| **ReLU** | Computationally cheap but prone to dead neurons. | Used only in the final head transitions. |
+| **Tanh** | Bound between -1 and 1. | Used exclusively in the Value Head. |
 
-The ChessNetPV architecture is a solid starting point but suffers from inefficient parameter allocation. The massive investment of resources in the final fully connected layers detracts from the convolutional rook, which is where the real "analysis" of the chess position takes place.  
-To transform ChessNetPV into a world-class engine while maintaining tensor compatibility:
 
-* **Prioritize Depth over Breadth**: Change the expansive scheme (128-1024) to a constant one (256-256) with more layers.
-* **Eliminate the Linear Bottleneck**: Use a reduction convolution ($1 \\times 1 \\times 32$) before the linear layers to save 65 million parameters. 
-* **Add Channel Support (SE)**Implement Squeeze-and-Excitation on each residual block to improve the relative importance of features. 
-* **Optimize Activations**: Migrate from ReLU to Mish to ensure a more stable and in-depth training experience.
+One of the most significant features of this implementation is the integration of **SEBlocks** within every residual layer. This allows the network to perform **selective attention**.
+
+* **Squeeze:** Global Average Pooling reduces the $8 \times 8$ feature map to a single scalar per channel.
+* **Excitation:** A small internal bottleneck calculates a weight vector to "excite" relevant information (e.g., an open diagonal) and "squeeze" noise.
+* **Math:** `u_tilde = sigmoid(g(z, W)) * u`. This recalibration allows the AI to discern which parts of the board state are tactically critical at any given moment with minimal parametric cost.
+
+
+A common flaw in chess NNs is the transition from high-dimensional convolutions to dense layers, which can create models with over 67 million parameters in a single layer, leading to overfitting and high latency.
+
+**Our Optimization Strategy:**
+The `ChessNetPV_Optimized` solves this using a **1x1 Convolutional Bottleneck** (`head_bottleneck_channels = 32`).
+
+* **The Reduction:** Before the data reaches the Fully Connected (FC) layers, we compress the `base_channels` (256) down to just 32.
+* **The Result:** Instead of connecting 65,536 inputs to the dense layer, we connect only **2,048** ($32 \times 8 \times 8$). This reduces the parameter count in the head from ~67 million to approximately **2 million**, redistributing the "brain power" to the convolutional body where strategic patterns are actually learned.
+
+#### Policy Header Evaluation and Movement Mapping
+
+The Policy Head outputs a vector of **4096 elements**, representing a mapping of 64 source squares to 64 destination squares.
+
+* Although we use a flat vector for compatibility, the internal bottleneck ensures the network learns the spatial relationships of the 8x8 grid before the final prediction. It acts as a probability distribution over all potentially legal moves.
+
+
+#### Value head
+
+The Value Head predicts a single scalar using a **Tanh** activation, ranging from -1 (Black winning) to +1 (White winning).
+
+* It takes the compressed features and passes them through a hidden layer of 256 neurons before the final scalar output. This provides the "evaluation" that guides the **MCTS** algorithm to prune bad variations and focus on winning lines.
+
+
+#### Analisys
+
+The learning capacity of a chess network is manifested in its ability to overcome static material evaluation and understand positional compensation. With its current architecture, ChessNetPV has a limited "view" of only a few steps of interaction between pieces due to its shallow depth.
+
+For a neural network to understand a concept like the "bayonet attack" in the King's Indian Defense, it must integrate information from the entire board. 
+
+Increasing the depth to a tower of 12-20 residual blocks of constant width (e.g., 256 filters) would ensure that each square on the board receives information from all other squares multiple times at each inference step. This would allow the network to learn "double front" tactics and deep prophylaxis maneuvers, characteristics of grandmaster-level play.
 
 These architectural improvements allow the neural network not only to "see" the pieces on the board, but also to understand underlying tensions and long-term strategic plans, significantly enhancing its learning capacity without prohibitively increasing memory usage or computation time. Compatibility remains unchanged, but the model's internal intelligence is substantially refined, bringing it closer to the performance standards set by leading projects in modern chess computing.
 
-## Training 
+### Training 
 
 Here is our function:
 
@@ -854,7 +798,7 @@ Here is a detailed breakdown of the training function:
 
 ***
 
-### ⚙️ 1. Initialization and Hyperparameter Setup
+#### ⚙️ 1. Initialization and Hyperparameter Setup
 
 This section defines the mathematical tools and parameters that control the learning process.
 
@@ -869,7 +813,7 @@ This section defines the mathematical tools and parameters that control the lear
 
 ***
 
-### 🔁 2. Training Loop (`model.train()`)
+#### 🔁 2. Training Loop (`model.train()`)
 
 This loop processes the training data, performing the iterative learning steps known as the **backpropagation algorithm**.
 
@@ -884,7 +828,7 @@ This loop processes the training data, performing the iterative learning steps k
 
 ***
 
-### 🔬 3. Validation and Control Flow
+#### 🔬 3. Validation and Control Flow
 
 After the training phase of an epoch, the model is evaluated on the test set, and its performance is checked against the control mechanisms.
 
@@ -897,7 +841,7 @@ After the training phase of an epoch, the model is evaluated on the test set, an
     * **Accuracy:** Calculated by comparing the index of the highest logit prediction (`output.argmax(dim=1)`) with the true target move.
 4. **Reporting:** Prints the calculated `Test Loss` and `Accuracy` percentage.
 
-### B. Early Stopping and Scheduling:
+#### B. Early Stopping and Scheduling:
 
 1. **Early Stopping Logic:**
     * If `test_loss` improves (is less than `best_loss`), the best model metrics are updated, and **`patience` is reset to 0**.
@@ -1030,11 +974,11 @@ In chess, there are often **many good moves** in a given position, so even a rel
 * **Competitive Environment**: Even a relatively modest level of accuracy can be useful when applied through methods like **Monte Carlo Tree Search (MCTS)** or **other decision-making algorithms**. These methods don't rely on 100% accuracy but instead use the predictions to guide the search, selecting moves based on probabilities.
 * **Better than Random**: If the model is consistently identifying useful moves and not just random guesses, even a lower accuracy can still make the model a very competent player, especially when paired with techniques like **MCTS**.
 
-### **What You Can Do:**
+### **What We Can Do:**
 
 * **Track Improvements**: If the accuracy continues to improve over time, that’s a positive sign, even if it's a slow rate of change. Sometimes **small improvements** can lead to significant strategic advances.
-* **Tuning**: You can try increasing the **model's complexity** (adding more layers, channels, etc.), but be mindful of the **risk of overfitting** or overcomplicating the model.
-* **Enhance Search Algorithms**: You can leverage your model's output as a **guide** rather than the sole determinant of the best move. Using **MCTS** or similar algorithms allows the AI to simulate more moves and refine its decision-making.
+* **Tuning**: We can try increasing the **model's complexity** (adding more layers, channels, etc.), but be mindful of the **risk of overfitting** or overcomplicating the model.
+* **Enhance Search Algorithms**: We can leverage ur model's output as a **guide** rather than the sole determinant of the best move. Using **MCTS** or similar algorithms allows the AI to simulate more moves and refine its decision-making.
 
 **28% accuracy** might sound low, but in chess, even a model with modest success at predicting good moves can lead to **strong performance** when combined with additional strategies like MCTS. Keep testing and refining, and you could see steady improvements as the model and the search methods evolve!
 
@@ -1075,33 +1019,6 @@ print(model)
 model_route = '/kaggle/working/modelo_entrenado_chessintionv2.pth'
 model.load_state_dict(torch.load(model_route))
 ```
-
-# **Summary of Our Chess AI solution**
-
-**Chess AI Model Structure**
-
-* Using a **CNN (Convolutional Neural Network)** to predict the best move from a chess position.
-* Input is a **77-layer 8×8 matrix** representing the board.
-* The model has **4 convolutional layers, batch normalization, and fully connected layers** leading to **4096 possible move outputs** and a **Value**.
-
-**Move Representation**
-
-* Moves are encoded in a **0-4096 format** using `np.ravel_multi_index()`.
-* This format aligns with the **8×8×64 legal move matrix**, making it easier for AI to learn.
-* We need to **convert UCI chess notation to this format and back**.
-
-**Saving and Loading the Model**
-
-* **Only saving `state_dict()` is recommended** for portability.
-* `torch.save(model.state_dict(), path)` and then reload with `model.load_state_dict(torch.load(path))`.
-* If saving the full model, define the class globally to avoid `pickle` errors.
-
-**Training Strategy**
-
-* **Dataset:** Started with **200k chess positions**, but **1M available**.
-* **Batch Size:** 64-128 (balance between speed and stability).
-* **Train/Test Split:** 80% training, 20% testing.
-* **Epochs:** Start with **10-30 epochs**, use **early stopping** to prevent overfitting.
 
 
 1. AlphaZero \- Chessprogramming wiki, s'hi ha accedit el dia de febrer 6, 2026,[https://www.chessprogramming.org/AlphaZero](https://www.chessprogramming.org/AlphaZero)  

@@ -11,8 +11,15 @@ import { GameState } from "../../services/chessGameService.js";
 class PlayComponent extends HTMLElement {
 
     state = new GameState("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+    stateSubscription = null;
+    board = null;
+    handleBoardMove = null;
+    handlePlayersChanged = null;
+    handleStartGame = null;
+    handleAiToggleChanged = null;
  
     async connectedCallback() {
+        this.state.resume();
 
         this.append(
             initStyle(style),
@@ -20,80 +27,11 @@ class PlayComponent extends HTMLElement {
         );
 
         //Board
-        const board = document.createElement("chess-board");
-        const gameStatus = this.querySelector("#gameStatus");
+        this.board = document.createElement("chess-board");
+        const board = this.board;
+        const gameStatus = this.querySelector("chess-game-status");
 
-        const parseFenMeta = (fen) => {
-            if (!fen || typeof fen !== "string") {
-                return null;
-            }
-
-            const [position, activeColor, castling, enPassant, halfmove, fullmove] = fen.split(" ");
-            if (!position || !activeColor) {
-                return null;
-            }
-
-            const turnPiece = activeColor === "w" ? "♙" : "♟";
-            const turnClass = activeColor === "w" ? "turn-white" : "turn-black";
-            const castlingLabel = castling && castling !== "-" ? castling : "—";
-
-            return {
-                turnPiece,
-                turnClass,
-                castlingLabel,
-                enPassant: enPassant || "-",
-                halfmove: halfmove || "0",
-                fullmove: fullmove || "1"
-            };
-        };
-
-        const renderStatusHtml = (gs) => {
-            const fenMeta = parseFenMeta(gs?.fen);
-            if (!fenMeta) {
-                return "";
-            }
-
-            let stateText = "Playing";
-            let stateClass = "status-chip status-running";
-
-            if (gs.ended) {
-                if (gs.endReason === "checkmate") {
-                    const winner = gs.winner === "white" ? "♙" : "♟";
-                    stateText = `Mate ${winner}`;
-                    stateClass = "status-chip status-checkmate";
-                } else if (gs.endReason === "stalemate") {
-                    stateText = "Stalemate";
-                    stateClass = "status-chip status-draw";
-                } else {
-                    stateText = "Draw";
-                    stateClass = "status-chip status-draw";
-                }
-            } else if (gs.inCheck) {
-                const checkedSide = gs.currentPlayer === "w" ? "♙" : "♟";
-                stateText = `Check ${checkedSide}`;
-                stateClass = "status-chip status-check";
-            }
-
-            return `
-                <span class="status-table">
-                    <span class="status-head">State</span>
-                    <span class="status-head">Turn</span>
-                    <span class="status-head">Castling</span>
-                    <span class="status-head">En Passant</span>
-                    <span class="status-head">Half</span>
-                    <span class="status-head">Full</span>
-
-                    <span class="${stateClass} status-cell status-state">${stateText}</span>
-                    <span class="status-chip status-cell status-turn ${fenMeta.turnClass}" title="Turn">${fenMeta.turnPiece}</span>
-                    <span class="status-chip status-cell status-meta">${fenMeta.castlingLabel}</span>
-                    <span class="status-chip status-cell status-meta">${fenMeta.enPassant}</span>
-                    <span class="status-chip status-cell status-meta">${fenMeta.halfmove}</span>
-                    <span class="status-chip status-cell status-meta">${fenMeta.fullmove}</span>
-                </span>
-            `;
-        };
-
-        this.state.state$.subscribe(gs => {
+        this.stateSubscription = this.state.state$.subscribe(gs => {
             board.state.movesHistory.next([...board.state.movesHistory.getValue(),
                 { fen: board.dataset.fen, move: gs.lastMove}])
             board.dataset.fen = gs.fen;
@@ -106,7 +44,7 @@ class PlayComponent extends HTMLElement {
             board.state.suggestedMoves.next(gs.suggestedMoves || []);
 
             if (gameStatus) {
-                gameStatus.innerHTML = renderStatusHtml(gs);
+                gameStatus.gameState = gs;
             }
             //console.log(gs.fen , board.state.movesHistory.getValue());
             
@@ -115,12 +53,13 @@ class PlayComponent extends HTMLElement {
         const boardContainer = this.querySelector("#boardContainer");
         boardContainer.append(board);
 
-        board.addEventListener("makeMove", (e) => {          
+        this.handleBoardMove = (e) => {
             const uci = e.detail.message;
             this.state.move = uci;
-        });
+        };
+        board.addEventListener("makeMove", this.handleBoardMove);
 
-        this.addEventListener("playersChanged", (e) => {
+        this.handlePlayersChanged = (e) => {
             const players = e.detail;
             // keep players (w/b and api urls)
             this.state.players = {
@@ -137,10 +76,27 @@ class PlayComponent extends HTMLElement {
                     suggestOnly: !!players.suggestOnly
                 };
             }
-        });
+        };
+        this.addEventListener("playersChanged", this.handlePlayersChanged);
+
+        this.handleAiToggleChanged = (e) => {
+            const shouldStop = !!e?.detail?.stopped;
+            const currentState = this.state.state$.getValue();
+
+            if (shouldStop) {
+                this.state.stop();
+                return;
+            }
+
+            this.state.resume();
+            if (currentState && !currentState.ended) {
+                this.state.decideNextMove(currentState);
+            }
+        };
+        this.addEventListener('aiToggleChanged', this.handleAiToggleChanged);
 
         // Start game event includes players + settings
-        this.addEventListener('startGame', (e) => {
+        this.handleStartGame = (e) => {
             const sel = e.detail;
             this.state.players = {
                 w: sel.w,
@@ -158,9 +114,41 @@ class PlayComponent extends HTMLElement {
             if (currentState && !currentState.ended) {
                 this.state.decideNextMove(currentState);
             }
-        });
+        };
+        this.addEventListener('startGame', this.handleStartGame);
 
         // Start game button http://10.100.22.119:8000/predict
+    }
+
+    disconnectedCallback() {
+        this.state.stop();
+
+        if (this.stateSubscription) {
+            this.stateSubscription.unsubscribe();
+            this.stateSubscription = null;
+        }
+
+        if (this.board && this.handleBoardMove) {
+            this.board.removeEventListener("makeMove", this.handleBoardMove);
+        }
+
+        if (this.handlePlayersChanged) {
+            this.removeEventListener("playersChanged", this.handlePlayersChanged);
+        }
+
+        if (this.handleStartGame) {
+            this.removeEventListener("startGame", this.handleStartGame);
+        }
+
+        if (this.handleAiToggleChanged) {
+            this.removeEventListener("aiToggleChanged", this.handleAiToggleChanged);
+        }
+
+        this.handleBoardMove = null;
+        this.handlePlayersChanged = null;
+        this.handleStartGame = null;
+        this.handleAiToggleChanged = null;
+        this.board = null;
     }
 
 

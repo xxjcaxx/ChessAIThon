@@ -14,6 +14,7 @@ class PlayersComponent extends HTMLElement {
 
     async connectedCallback() {
         const LOCAL_STORAGE_KEY = 'players_config';
+        let aiStopped = false;
 
         const savePlayersConfig = () => {
             const payload = {
@@ -77,7 +78,24 @@ class PlayersComponent extends HTMLElement {
             const event = new CustomEvent('playersChanged', { detail: selected, bubbles: true });
             this.dispatchEvent(event);
             savePlayersConfig();
+
+            const hasAnyAI = selected.w === 'ai' || selected.b === 'ai';
+            const aiToggleBtn = this.querySelector('#ai_toggle');
+            if (aiToggleBtn) {
+                aiToggleBtn.disabled = !hasAnyAI;
+            }
         }
+
+        const renderAiToggleButton = () => {
+            const aiToggleBtn = this.querySelector('#ai_toggle');
+            if (!aiToggleBtn) {
+                return;
+            }
+
+            aiToggleBtn.textContent = aiStopped ? 'Restart AI' : 'Stop AI';
+            aiToggleBtn.classList.toggle('is-warning', !aiStopped);
+            aiToggleBtn.classList.toggle('is-success', aiStopped);
+        };
 
         const players = ["player1", "player2"];
 
@@ -107,6 +125,22 @@ class PlayersComponent extends HTMLElement {
         if (puctInput) puctInput.addEventListener('input', () => toggleAIInput());
         if (suggestOnlyInput) suggestOnlyInput.addEventListener('change', () => toggleAIInput());
 
+        const aiToggleBtn = this.querySelector('#ai_toggle');
+        renderAiToggleButton();
+        if (aiToggleBtn) {
+            aiToggleBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                aiStopped = !aiStopped;
+                renderAiToggleButton();
+
+                const event = new CustomEvent('aiToggleChanged', {
+                    detail: { stopped: aiStopped },
+                    bubbles: true
+                });
+                this.dispatchEvent(event);
+            });
+        }
+
         // Botón de inicio de juego
         this.querySelector('#start_game').addEventListener('click', (e) => {
             e.preventDefault();
@@ -121,6 +155,17 @@ class PlayersComponent extends HTMLElement {
             };
             const event = new CustomEvent('startGame', { detail: selected, bubbles: true });
             this.dispatchEvent(event);
+
+            if (aiStopped) {
+                aiStopped = false;
+                renderAiToggleButton();
+                const resumeEvent = new CustomEvent('aiToggleChanged', {
+                    detail: { stopped: false },
+                    bubbles: true
+                });
+                this.dispatchEvent(resumeEvent);
+            }
+
             savePlayersConfig();
         });
 

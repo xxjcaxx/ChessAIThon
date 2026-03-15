@@ -85,6 +85,7 @@ for i in range(84):
 plt.show()
 ```
 
+```
     Fen:  r3k2r/1bqp1pp1/p1nbpn1p/8/Pp2PP2/1B1QB2N/1PPN2PP/R3K2R b KQkq - 0 13
     Turn matrix: 
     [[0 0 0 0 0 0 0 0]
@@ -96,7 +97,7 @@ plt.show()
      [0 0 0 0 0 0 0 0]
      [0 0 0 0 0 0 0 0]]
     (77, 8, 8)
-
+```
 
 
     

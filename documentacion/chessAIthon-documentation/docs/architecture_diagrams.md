@@ -1,127 +1,42 @@
 # Architecture diagrams (ASCII + Mermaid)
 
-Below are an ASCII diagram and a Mermaid diagram that show the runtime components and data flow (Gradio/FastAPI → predict_fn → MCTS → ChessBatcher → GPU worker → dispatch → MCTS/client).
-
-## ASCII diagram
-
-```
-                                 +-----------------+
-                                 |   Browser /     |
-                                 |   CLI / curl    |
-                                 +--------+--------+
-                                          |
-                                          | HTTP request (Gradio UI or FastAPI)
-                                          v
-            +-----------------------------+------------------------------+
-            |                           app.py                           |
-            |  - Gradio (0.0.0.0:7860)   - FastAPI (0.0.0.0:8000)        |
-            |                            - predict_fn(fen, sims)         |
-            +-----------------------------+------------------------------+
-                                          |
-                    +---------------------+---------------------+
-                    |                                           |
-        Gradio calls predict_fn                         FastAPI calls predict_fn
-                    |                                           |
-                    +---------------------+---------------------+
-                                          |
-                                          v
-                                 +-------------------------------------------+
-                                 | predict_fn                                |
-                                 | (calls chesmarro_mcts_predict_chess_move) |
-                                 +-------------------------------------------+
-                                          |
-                                          v
-                         +------------------------------------+
-                         | chessmarro_mcts_predict_chess_move |
-                         |  - create root MCTSNode (Board)    |
-                         |  - Manager() and ChessBatcher      |
-                         +----------------+-------------------+
-                                          |
-                                          v
-                                 +---------------------------+
-                                 |           MCTS            |
-                                 |  (many worker threads)    |
-                                 |  - _select                |
-                                 |  - _expand                |
-                                 |  - _simulate             <- calls get_best()
-                                 |  - _backpropagate        |
-                                 +------------+--------------+
-                                              |
-                                              v
-                       get_best(state) -> convert state -> board_tensor
-                                              |
-                                              v
-                                 +---------------------------+
-                                 |       ChessBatcher        |
-                                 |  - current_batch list     |
-                                 |  - add_board(board_tensor, response_q)  |
-                                 |  - flusher thread (timer)| 
-                                 |  - _flush_batch -> input_queue -> GPU worker
-                                 +------------+--------------+
-                                              |
-                            +-----------------+-----------------+
-                            |                                   |
-                            v                                   v
-                   +--------------------------+          +-------------------------+
-                   | batch_predict_worker     |  <---    input_queue  (Process)    |
-                   | (process on host)        |          | Uses model & device     |
-                   | - stack tensors          |          +-------------------------+
-                   | - model(boards)->preds   |
-                   | - preds = [UCI,...]      |
-                   +-----------+--------------+
-                               |
-                               v
-                          output_queue (task_id, uci_move)
-                               |
-                               v
-                         +--------------------+
-                         |  dispatch_loop     |
-                         |  (process)         |
-                         |  - pop output_queue|
-                         |  - pending[task_id].put(pred) |
-                         +--------------------+
-                               |
-                               v
-                       response_q.get()  (MCTS thread blocked until pred)
-                               |
-                               v
-                            MCTS resumes simulation (uses UCI -> chess.Move)
-                               |
-                               v
-                    Simulation ends -> _backpropagate -> continue until all sims
-                               |
-                               v
-                     chessmarro_mcts_predict_chess_move returns best_move (UCI)
-                               |
-                               v
-                         predict_fn returns UCI string to caller
-                               |
-                               v
-                 Gradio UI displays it / FastAPI returns JSON {"move":"e2e4"}
-```
-
 ## Mermaid diagram
 
 The following Mermaid flowchart describes the same architecture. 
 
 ```mermaid
-flowchart LR
+flowchart TD
   A[Browser / CLI / curl]
-  A -->|HTTP request| B["app.py<br>(Gradio 7860 / FastAPI 8000)<br>get_model() lazy"]
-  B --> C[predict_fn]
-  C --> D[chessmarro_mcts_predict_chess_move]
-  D --> E[MCTS]
-  E -->|calls| F["get_best(state) -&gt; board_tensor"]
-  F --> G["ChessBatcher<br>(current_batch, flusher)"]
-  G -->|flush| H[input_queue]
-  H --> I["batch_predict_worker<br>(process)<br>(model on device)"]
-  I --> J["output_queue<br>(task_id, uci_move)"]
-  J --> K["dispatch_loop<br>(process)"]
-  K --> L["response_q (per request)"]
-  L --> E
-  E --> M["return best_move (UCI)"]
-  M --> N["caller receives move"]
+  B["app.py<br/>main(): spawn + run()"]
+  C["bestmultithread.main.run()<br/>get_model() + main()"]
+  D["FastAPI /predict<br/>api.create_api().predict()"]
 
-  style B fill:#f9f,stroke:#333,stroke-width:1px
-  style I fill:#bff,stroke:#333,stroke-width:1px
+  E["task_q.put(task_id, fen, simulations, mcts_tree)"]
+  F["task_listener process"]
+  G["mcts_worker_persistent process(es)"]
+  H["MCTS + threads"]
+  I["get_best_move(board)"]
+  J["batcher_q.put((id_worker,(thread_id, board_tensor)))"]
+
+  K["batcher_loop process<br/>dynamic batch + timeout"]
+  L["inference_q"]
+  M["inference_server process<br/>predict_with_value_batch_fast + extract_moves"]
+  N["inference_response_q"]
+  O["worker_response_queues[id_worker]"]
+  P["receiver thread -> thread_responses[thread_id]"]
+
+  Q["mcts_result_q.put(worker_result)"]
+  R["task_listener aggregation<br/>Counter + best_move + alternatives"]
+  S["tasks_result_q.put(task_id, move, visits, alternatives, mcts_tree)"]
+  T["API reads tasks_result_q and returns JSON"]
+
+  A -->|HTTP request| D
+  B --> C --> D
+  D --> E --> F --> G --> H --> I --> J --> K --> L --> M --> N --> O --> P --> I
+  G --> Q --> R --> S --> T --> A
+
+  style C fill:#f9f,stroke:#333,stroke-width:1px
+  style M fill:#bff,stroke:#333,stroke-width:1px
+  style K fill:#e8f5e9,stroke:#333,stroke-width:1px
+  style F fill:#fff3e0,stroke:#333,stroke-width:1px
 ```
