@@ -38,9 +38,73 @@ By focusing on these practical applications, ChessAIThon aims to provide VET stu
 
 > ChessAIthon is the name of the complete project. As a pun, we named ChessNet the NN base of our project. ChessMarro is the name of the AI (ChessNet+Deploy). ChessMinds is the name of the web frontend to play with ChessMarro and to create datasets. 
 
-## Slides
 
-* [Project presentation](ChessAIThon-Integrating-Chess-Coding-and-AI.pdf)
-* [AI presentation](Developing-a-Chess-AI-with-Convolutional-Neural-Networks.pdf)
-* [MCTS presentation](Monte-Carlo-Tree-Search-Intelligent-Game-Strategy.pdf)
-* [Full technical project presentation](presentacio.pdf)
+---
+
+## Open Sourcing the project
+
+This strategy represents a high-standard framework for Open Science and Technical-Vocational Education and Training (VET). By distributing assets across specialized platforms, the project ensures **high availability, technical transparency, and a frictionless learning curve.**
+
+### 1. Models amd Datasets: Hugging Face & Kaggle
+
+https://www.kaggle.com/datasets/xxjcaxx/chessmarro-dataset
+https://www.kaggle.com/datasets/xxjcaxx/lc0-fen-uci-move-and-value
+https://www.kaggle.com/code/xxjcaxx/cnn-pytorch-chess-generic
+https://huggingface.co/spaces/jocasal/chessAIthon/tree/main
+
+
+The separation of model weights from the source code is a fundamental practice in modern AI. Hosting on **Hugging Face** provides a robust API for programmatic access, while **Kaggle** offers a direct interface for data science experimentation.
+
+* **Academic Justification:** This dual-hosting strategy prevents "Data Siloing." It allows for independent verification of the neural network’s architecture and weights, facilitating peer review and "Transfer Learning" research.
+* **VET Educational Benefit:** Students gain experience with **Model Registry** concepts. They learn to manage large-scale binary files ($>100$ MB) separately from source code, a critical skill in MLOps (Machine Learning Operations).
+
+### 2. Code & Documentation: GitHub & GitHub Pages
+
+https://github.com/xxjcaxx/ChessAIThon
+https://xxjcaxx.github.io/ChessAIThon/
+
+The project utilizes **GitHub** for version control and **Docusaurus** (via GitHub Pages) for technical documentation. Docusaurus transforms Markdown—a lightweight markup language—into a structured, searchable, and web-optimized manual.
+
+* **Academic Justification:** Documentation-as-Code ensures that the "Technical Manual" evolves at the same rate as the software. By making the documentation human-readable and machine-parsable, we ensure long-term project sustainability.
+* **VET Educational Benefit:** It exposes students to **CI/CD (Continuous Integration/Continuous Deployment)**. They see how a commit in a repository triggers an automated build that updates the public documentation, mirroring professional software engineering workflows.
+
+### 3. Notebooks: Kaggle & GitHub
+
+https://www.kaggle.com/code/xxjcaxx/cnn-pytorch-chess-generic
+https://github.com/xxjcaxx/ChessAIThon/tree/master/training
+
+
+By providing "Ready-to-Run" Jupyter Notebooks on Kaggle, the project removes the hardware barrier.
+
+* **Academic Justification:** This ensures **Total Reproducibility**. In the "Replication Crisis" of modern AI, providing the exact environment and compute used for training is the only way to validate scientific claims.
+* **VET Educational Benefit:** Students often lack high-end hardware (GPUs/TPUs). Kaggle’s free compute allows students from all socio-economic backgrounds to execute complex MCTS simulations and neural training, promoting **equity in technical education**.
+
+### 4. Deployment: Hugging Face Spaces (MCTS)
+
+https://huggingface.co/spaces/jocasal/chessAIthon
+https://jocasal-chessAIthon.hf.space/predict only accesible by a Web Client:
+
+```bash
+curl -X POST "https://jocasal-chessAIthon.hf.space/predict"      -H "Content-Type: application/json"      -d '{"fen": "rnb1k1nr/pppp1ppp/5q2/2bP4/8/5N2/PPP1PPPP/RNBQKB1R w KQkq - 3 6", "simulations": 4000}'
+
+{"move":"b1c3","visits":1956,"alternatives":[["e2e3",945],["e2e4",583],["c1g5",115]]}
+```
+
+
+Deploying the MCTS engine via **Hugging Face Spaces** (using FastAPI) creates a functional bridge between the backend logic and the end-user.
+
+* **Academic Justification:** This serves as a "Black-Box Testing" environment. It allows researchers to interactively probe the model for biases or strategic weaknesses in real-time without local configuration.
+* **VET Educational Benefit:** It teaches **Web-Service Integration**. Students learn how a Python-based AI backend can be exposed through a web interface, a core competency for modern Full-Stack AI developers.
+
+### 5. Web Application: Vercel (ChessMinds Webpage)
+
+https://chess-ai-thon.vercel.app/
+
+
+The use of **Vercel** for the project's application to play chess provides a professional, high-performance entry point.
+
+* **Academic Justification:** Separation of Concerns. By decoupling the "Project Application" (Vercel) from the "Technical Documentation" (GitHub Pages), the project maintains a clear hierarchy of information for different stakeholders.
+* **VET Educational Benefit:** Students observe the importance of **Frontend Performance and CDN (Content Delivery Network)** distribution. They learn that user experience (UX) is as vital as the underlying algorithm for project adoption.
+
+
+The **ChessAIthon** distribution model is not merely a set of links; it is a coordinated **Technical Ecosystem**. It adheres to the **FAIR Principles** (Findable, Accessible, Interoperable, and Reusable). For VET institutions, this project provides a holistic "Blueprint" for how modern AI projects are built, documented, and deployed in the industry today.
