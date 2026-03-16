@@ -44,6 +44,7 @@ paginate: true
 # How can I store scenarios and moves?
 
 -   **Standard Formats**: PGN (Games), FEN (Positions).
+    rnb1k1nr/pppp1ppp/5q2/2bP4/8/5N2/PPP1PPPP/RNBQKB1R w KQkq - 3 6
 -   **Data Science Stack**: CSV for simplicity, JSON for web APIs.
 -   **Parquet**: Columnar storage with **int64 compression**, reducing 10GB datasets to 1.5GB.
 -   **Version Control**: Using **Git/GitHub** to manage dataset iterations and collaborative student contributions.
@@ -88,11 +89,22 @@ paginate: true
 
 ![bg left:45% width:500px](Exploring%20Chessmaro%20AI%20Model_files/Exploring%20Chessmaro%20AI%20Model_21_6.png)
 
--   **Residual Tower**
 -   **Bitboard representation**: 77x8x8
 -   **Output**:
     - **Policies**: Probability distribution over 4096 possible moves.
     - **Value**: Predicting the win/loss outcome ([-1, 1]).
+`
+---
+
+# ChessNet
+`
+
+- **CNN layers**`
+- **Full Connected layers**
+- **Residual Tower**
+![width:100%](Exploring%20Chessmaro%20AI%20Model_files/chessnet.png)
+
+
 
 ---
 
