@@ -96,7 +96,9 @@ We can store data in JSON o Parquet. In JSON we decided to compress each of the 
 
 > The best dataset prepared to train is: https://www.kaggle.com/datasets/xxjcaxx/chessmarro-dataset/data 
 
+We adapted this dataset to work with policies and values. The final dataset is: https://www.kaggle.com/datasets/xxjcaxx/lc0-fen-uci-move-and-value 
 
+To create the dataset with values we deploy Leela Chess Zero with one node to extract the value and with 400 to extract the best move. It took more than 4 days of local server computing to create the final dataset and convert to parquet. 
 
 ### Training
 
@@ -110,18 +112,22 @@ This version (obsolete) uses only mates and has 90% of precision https://www.kag
 
 The result CNN is not bad for the performance. Add more layers, or wider layers should increase precision, but it could be slower. We do lots of fine tunnings and this CNN and the result model is, for the moment, sufficient to go ahead.
 
+The model suffer lots of changes, last version is: https://github.com/xxjcaxx/ChessAIThon/blob/master/modelDeploy/chessmodel.py#L216 
+
+First versions were without value output. The have some CNN networks and increase depth in each layer. Last version has 6 or 12 CNN networks of 256 layers with residual, Mish activation ans many improvements that doesn't increase training or inference times and memory. 
+
 
 ### Deploying the model
 
-We have a deployment in kaggle with MCTS: https://www.kaggle.com/code/xxjcaxx/launching-chessmarro
+We have a deployment in kaggle with MCTS: https://github.com/xxjcaxx/ChessAIThon/tree/master/modelDeploy
 
-And a demo in kaggle to play with the model: https://www.kaggle.com/code/xxjcaxx/play-with-chessmarro
+And a demo in kaggle to play with the model: https://www.kaggle.com/code/xxjcaxx/play-with-chessmarro (obsolete since Hugginface space)
 
-As we have lots of Kaggle and Colabs, we need to share the CNN and the model. We share it in Hugginface: https://huggingface.co/jocasal/chessmarrov1
+As we have lots of Kaggle and Colabs, we need to share the CNN and the model. We share it in Hugginface: https://www.kaggle.com/models/xxjcaxx/chessmarro/PyTorch/first-version?select=chessmarro_v9_final.pth
 
-We deployed with CPU in Huggingface: https://huggingface.co/spaces/jocasal/chessmarro/tree/main
+We deployed with GPU in Huggingface: https://huggingface.co/spaces/jocasal/chessAIthon
 
-And we have a Github repository: https://github.com/xxjcaxx/ai-libraries
+And we have a Github repository: https://github.com/xxjcaxx/ai-libraries (obsolete, now is integrated in main repository)
 
 Now, add this "AI Libraries" to the official repository.
 

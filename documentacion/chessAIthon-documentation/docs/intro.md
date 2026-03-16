@@ -47,21 +47,22 @@ This strategy represents a high-standard framework for Open Science and Technica
 
 ### 1. Models amd Datasets: Hugging Face & Kaggle
 
-https://www.kaggle.com/datasets/xxjcaxx/chessmarro-dataset
-https://www.kaggle.com/datasets/xxjcaxx/lc0-fen-uci-move-and-value
-https://www.kaggle.com/code/xxjcaxx/cnn-pytorch-chess-generic
-https://huggingface.co/spaces/jocasal/chessAIthon/tree/main
+- Complete dataset : https://www.kaggle.com/datasets/xxjcaxx/chessmarro-dataset
+- Dataset with values for the last training: https://www.kaggle.com/datasets/xxjcaxx/lc0-fen-uci-move-and-value
+- Notebook of trainings: https://www.kaggle.com/code/xxjcaxx/cnn-pytorch-chess-generic
+- Code of deployed AI with last model: https://huggingface.co/spaces/jocasal/chessAIthon/tree/main
 
 
 The separation of model weights from the source code is a fundamental practice in modern AI. Hosting on **Hugging Face** provides a robust API for programmatic access, while **Kaggle** offers a direct interface for data science experimentation.
 
 * **Academic Justification:** This dual-hosting strategy prevents "Data Siloing." It allows for independent verification of the neural network’s architecture and weights, facilitating peer review and "Transfer Learning" research.
-* **VET Educational Benefit:** Students gain experience with **Model Registry** concepts. They learn to manage large-scale binary files ($>100$ MB) separately from source code, a critical skill in MLOps (Machine Learning Operations).
+* **VET Educational Benefit:** Students gain experience with **Model Registry** concepts. They learn to manage large-scale binary files separately from source code, a critical skill in MLOps (Machine Learning Operations).
 
 ### 2. Code & Documentation: GitHub & GitHub Pages
 
-https://github.com/xxjcaxx/ChessAIThon
-https://xxjcaxx.github.io/ChessAIThon/
+- Main repository of the project (code, training, deploy, documentation, web application): https://github.com/xxjcaxx/ChessAIThon
+- Technical documentation of AI, deploy and web page: https://xxjcaxx.github.io/ChessAIThon/
+- Library to print boards in web pages made for this projecte, but separated. It can be reutilized in other projects: https://github.com/xxjcaxx/chessmarro-board
 
 The project utilizes **GitHub** for version control and **Docusaurus** (via GitHub Pages) for technical documentation. Docusaurus transforms Markdown—a lightweight markup language—into a structured, searchable, and web-optimized manual.
 
@@ -70,8 +71,8 @@ The project utilizes **GitHub** for version control and **Docusaurus** (via GitH
 
 ### 3. Notebooks: Kaggle & GitHub
 
-https://www.kaggle.com/code/xxjcaxx/cnn-pytorch-chess-generic
-https://github.com/xxjcaxx/ChessAIThon/tree/master/training
+- Notebook of trainings: https://www.kaggle.com/code/xxjcaxx/cnn-pytorch-chess-generic
+- Last notebooks where created and deployed on premise, this is the code: https://github.com/xxjcaxx/ChessAIThon/tree/master/training
 
 
 By providing "Ready-to-Run" Jupyter Notebooks on Kaggle, the project removes the hardware barrier.
@@ -81,8 +82,8 @@ By providing "Ready-to-Run" Jupyter Notebooks on Kaggle, the project removes the
 
 ### 4. Deployment: Hugging Face Spaces (MCTS)
 
-https://huggingface.co/spaces/jocasal/chessAIthon
-https://jocasal-chessAIthon.hf.space/predict only accesible by a Web Client:
+- Huggingface Space of the AI deployed and usable by everyone: https://huggingface.co/spaces/jocasal/chessAIthon
+- Enpoint of the API: https://jocasal-chessAIthon.hf.space/predict only accesible by a Web Client:
 
 ```bash
 curl -X POST "https://jocasal-chessAIthon.hf.space/predict"      -H "Content-Type: application/json"      -d '{"fen": "rnb1k1nr/pppp1ppp/5q2/2bP4/8/5N2/PPP1PPPP/RNBQKB1R w KQkq - 3 6", "simulations": 4000}'
@@ -98,7 +99,7 @@ Deploying the MCTS engine via **Hugging Face Spaces** (using FastAPI) creates a 
 
 ### 5. Web Application: Vercel (ChessMinds Webpage)
 
-https://chess-ai-thon.vercel.app/
+- Web to create datasets for the competition, play against AI and learn how it works: https://chess-ai-thon.vercel.app/
 
 
 The use of **Vercel** for the project's application to play chess provides a professional, high-performance entry point.
