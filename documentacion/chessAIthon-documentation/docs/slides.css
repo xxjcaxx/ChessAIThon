@@ -1,6 +1,6 @@
 /* @theme custom-gamma */
 
-@import 'default';
+@import-theme 'default';
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=Fira+Code:wght@400;500&display=swap');
 
 :root {
@@ -20,9 +20,20 @@ section {
     font-family: var(--font-default);
     font-size: 24px;
     padding: 60px 80px;
-    background-color: var(--color-background);
-    color: var(--color-foreground);
+    background-color: var(--color-background) !important;
+    color: var(--color-foreground) !important;
     line-height: 1.6;
+}
+
+section h2,
+section h3,
+section p,
+section li,
+section blockquote,
+section table,
+section th,
+section td {
+    color: var(--color-foreground);
 }
 
 /* Background image handling */
@@ -48,9 +59,16 @@ h1, h2, h3 {
 }
 
 h1 {
-    font-size: 2em;
+    font-size: 1.8em;
+    color: #ffffff;
     margin-bottom: 0.5em;
     letter-spacing: -0.02em;
+}
+
+section:not(.lead) > h1 {
+    font-size: 1.55em !important;
+    color: #ffffff !important;
+    line-height: 1.2;
 }
 
 h2 {
@@ -88,9 +106,15 @@ ul {
 }
 
 li {
-    margin-bottom: 10px;
+    margin-bottom: 1px;
     position: relative;
-    padding-left: 30px;
+    padding-left: 20px;
+    line-height: 1.2;
+}
+
+li p {
+    line-height: 1.2;
+    margin: 0;
 }
 
 li::before {
@@ -125,17 +149,19 @@ footer {
 
 /* Lead Slide */
 section.lead {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
     background: linear-gradient(135deg, #0b0c1e 0%, #1a1b3a 100%);
     text-align: left;
 }
 
 section.lead h1 {
-    font-size: 4em;
+    font-size: 2.4em;
+    line-height: 1;
     color: #ffffff;
     margin-bottom: 10px;
+}
+
+section.lead[data-marpit-advanced-background='split'] h1 {
+    font-size: 2.4em;
 }
 
 .logos-container {

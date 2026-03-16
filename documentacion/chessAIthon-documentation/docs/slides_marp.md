@@ -8,18 +8,18 @@ paginate: true
 
 <!-- _class: lead -->
 
-# ChessAIThon Slides
+# ChessAIThon
 ### Strategic Gaming, Coding, and AI in VET Education
 
 ![bg left:40% width:450px](Exploring%20Chessmaro%20AI%20Model_files/logoblanc.png)
 
 
 
-*   How computers represent Chess scenarios and moves?
-*   How can I store scenarios and moves?
+*   How computers represent Chess boards and moves?
+*   How can I store boards and moves?
 *   How Chess AI works?
 *   How to train an AI for Chess?
-*   How to use this AI to get the best move?
+*   How to use AI to get the best move?
 *   How can I use my intelligence to improve AI?
 
 ![pos-bottom-left  width:200px](Exploring%20Chessmaro%20AI%20Model_files/erasmus_plus_ok.jpg)
@@ -90,18 +90,19 @@ paginate: true
 ![bg left:45% width:500px](Exploring%20Chessmaro%20AI%20Model_files/Exploring%20Chessmaro%20AI%20Model_21_6.png)
 
 -   **Bitboard representation**: 77x8x8
+-   **Chess is like an image**: 8x8 pixels of 77 bits of color depth.
 -   **Output**:
     - **Policies**: Probability distribution over 4096 possible moves.
     - **Value**: Predicting the win/loss outcome ([-1, 1]).
-`
+
 ---
 
 # ChessNet
-`
 
-- **CNN layers**`
-- **Full Connected layers**
-- **Residual Tower**
+
+- **CNN layers**: For spatial feature extraction (piece patterns, tactical motifs).
+- **Full Connected layers**: For integrating global board information and final predictions.
+- **Residual Tower**: For deeper feature learning without vanishing gradients.
 ![width:100%](Exploring%20Chessmaro%20AI%20Model_files/chessnet.png)
 
 
@@ -125,7 +126,6 @@ paginate: true
 
 -   **Top-1 Accuracy**: **~30%** (Matching Stockfish's perfect move).
 -   **Top-5 Accuracy**: **~70%** (Sufficient to prune MCTS search space).
--   **Human-like Behavior**: Matches human "mistakes" in complex positions, making it an ideal pedagogical tool.
 -   **Success**: Even modest accuracy leads to strong strategic play when paired with MCTS.
 
 ---
@@ -137,23 +137,31 @@ paginate: true
 -   **MCTS Guided Search**: Simulation explores branches prioritized by the CNN Policy.
 -   **Exploration (PUCT)**: Balancing known good moves with less-explored alternatives.
 -   **Noise**: Dirichlet noise at the root node ensures variety and prevents deterministic traps.
--   **Mixture of experts**: Different MCTS in parallel vote the best move. The fist trust in the CNN, the last more in exploration.
 
 ---
 
-# How can I use my inteligence to improve AI?
+# How can I use my intelligence to improve AI?
 
 ![bg left:45% width:500px](Exploring%20Chessmaro%20AI%20Model_files/Exploring%20Chessmaro%20AI%20Model_22_3.png)
 
--   **ChessMinds Web App**: Play against ChessMarro and contribute your best moves to the dataset.
+-   **ChessMinds Web App**: Play against other humans and contribute your best moves to the dataset.
 -   **Fine-tuning**: Use provided Notebooks to retrain the CNN on your personal games.
 -   **Community**: Modify architecture parameters or weights and share your version on HuggingFace.
 
+---
+
+# Links
+
+![bg left:45% width:500px](Exploring%20Chessmaro%20AI%20Model_files/links.png)
+
+-   **ChessMinds Web App**: https://chess-ai-thon.vercel.app/ 
+-   **GitHub**: https://github.com/xxjcaxx/ChessAIThon
+-   **HuggingFace Spaces Endpoint**: https://jocasal-chessAIthon.hf.space/predict 
 ---
 
 <!-- _class: lead -->
 
 # Thank You
 ### Questions & Collaborative AI Development
-**GitHub**: xxjcaxx/ChessAIThon
+**GitHub**: [xxjcaxx/ChessAIThon](https://github.com/xxjcaxx/ChessAIThon)
 
