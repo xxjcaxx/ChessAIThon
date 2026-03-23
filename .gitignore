@@ -1,5 +1,5 @@
 *.pth
 *.gzip
 *.json
-*.csv
+
 *.parquet
