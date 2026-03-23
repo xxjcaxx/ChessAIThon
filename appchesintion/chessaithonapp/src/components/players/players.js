@@ -72,7 +72,7 @@ class PlayersComponent extends HTMLElement {
                 wApi: this.querySelector(`#player1-api input`).value,
                 bApi: this.querySelector(`#player2-api input`).value,
                 simulations: Number(this.querySelector('#ai-simulations').value) || 400,
-                puct: Number(this.querySelector('#ai-puct').value) || 1.0,
+                puct:  1.4,
                 suggestOnly: this.querySelector('#ai-suggest-only')?.checked || false
             };
             const event = new CustomEvent('playersChanged', { detail: selected, bubbles: true });
@@ -114,6 +114,17 @@ class PlayersComponent extends HTMLElement {
             });
             apiField.addEventListener("input",()=>{
                 toggleAIInput(select, apiField);
+            });
+
+            // Botones de URL predefinida
+            apiField.querySelectorAll('[data-preset-url]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const urlInput = apiField.querySelector('input[type="url"]');
+                    if (urlInput) {
+                        urlInput.value = btn.dataset.presetUrl;
+                        toggleAIInput(select, apiField);
+                    }
+                });
             })
         });
 
@@ -150,7 +161,7 @@ class PlayersComponent extends HTMLElement {
                 wApi: this.querySelector(`#player1-api input`).value,
                 bApi: this.querySelector(`#player2-api input`).value,
                 simulations: Number(this.querySelector('#ai-simulations').value) || 400,
-                puct: Number(this.querySelector('#ai-puct').value) || 1.0,
+                puct:  1.4,
                 suggestOnly: this.querySelector('#ai-suggest-only')?.checked || false
             };
             const event = new CustomEvent('startGame', { detail: selected, bubbles: true });

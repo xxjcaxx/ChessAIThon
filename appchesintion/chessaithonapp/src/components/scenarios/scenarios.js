@@ -19,8 +19,30 @@ const createInputValue = (value) => {
   min="-1" 
   max="1" 
   step="0.01"
-   value="${value ? value : 0}" class="input is-small"/>`
+   value="${normalizeScenarioValue(value)}" class="input is-small"/>`
 }
+
+const normalizeScenarioValue = (value) => {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : 0.0;
+};
+
+const ensureScenarioValue = (scenario = {}) => {
+  return {
+    ...scenario,
+    value: normalizeScenarioValue(scenario.value)
+  };
+};
+
+const ensureScenariosWithValue = (scenarios = []) => {
+  return scenarios.map(ensureScenarioValue);
+};
+
+const formatValueForCsv = (value) => {
+  const normalized = normalizeScenarioValue(value);
+  const text = `${normalized}`;
+  return text.includes('.') ? text : `${text}.0`;
+};
 
 
 
@@ -57,7 +79,7 @@ const fensToRows = (rows) => {
         const storedBestMoves = loadLocalStorage();
         const index = storedBestMoves.findIndex(fen => fen.fen === newFen);
         if (index !== -1) {
-          storedBestMoves[index].value = newValue;
+          storedBestMoves[index].value = normalizeScenarioValue(newValue);
           localStorage.setItem('best_moves', JSON.stringify(storedBestMoves));
 
         }
@@ -122,7 +144,8 @@ class ScenariosComponent extends HTMLElement {
 
 
 
-    const storedBestMoves = loadLocalStorage();
+  const storedBestMoves = ensureScenariosWithValue(loadLocalStorage());
+  localStorage.setItem('best_moves', JSON.stringify(storedBestMoves));
 
 
     this.state.storedScenarios.next(storedBestMoves);
@@ -210,7 +233,8 @@ class ScenariosComponent extends HTMLElement {
 
 
     fromEvent(this, "makeMove").subscribe((event) => {
-      const storedBestMoves = loadLocalStorage();
+      const storedBestMoves = ensureScenariosWithValue(loadLocalStorage());
+      localStorage.setItem('best_moves', JSON.stringify(storedBestMoves));
       this.state.storedScenarios.next(storedBestMoves);
       //const ultimoElemento = storedScenarios.lastElementChild;
       storedScenarios.scrollTo({
@@ -265,7 +289,7 @@ class ScenariosComponent extends HTMLElement {
     fromEvent(document.querySelector('#addYourFen'), "click").subscribe(() => {
       const storedScenarios = this.state.storedScenarios.getValue();
       const yourFEN = document.querySelector('#yourFen').value;
-      storedScenarios.push({ fen: yourFEN });
+      storedScenarios.push({ fen: yourFEN, move: null, value: 0.0 });
       this.state.storedScenarios.next(storedScenarios);
 
 
@@ -274,15 +298,26 @@ class ScenariosComponent extends HTMLElement {
 
     this.querySelector('#saveCSVButton').addEventListener('click', async () => {
       //loadLocalStorage(); // Asegurarse de cargar los datos más recientes
-      const storedBestMoves = loadLocalStorage();
+      const storedBestMoves = ensureScenariosWithValue(loadLocalStorage());
+      localStorage.setItem('best_moves', JSON.stringify(storedBestMoves));
       console.log(storedBestMoves);
-      const headers = Object.keys(storedBestMoves[0]);
+      const headers = ['fen', 'move', 'value'];
 
       // 2. Construir las filas del CSV
       const csvContent = [
         headers.join(','), // Cabecera
         ...storedBestMoves.map(row =>
-          headers.map(fieldName => JSON.stringify(row[fieldName] || '')).join(',')
+          headers.map(fieldName => {
+            if (fieldName === 'value') {
+              return JSON.stringify(formatValueForCsv(row.value));
+            }
+
+            if (fieldName === 'move') {
+              return JSON.stringify(row.move || '');
+            }
+
+            return JSON.stringify(row[fieldName] || '');
+          }).join(',')
         )
       ].join('\r\n');
 

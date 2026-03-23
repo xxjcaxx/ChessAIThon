@@ -100,6 +100,16 @@ export class GameState {
     this.aiStopped = false;
   }
 
+  reset(fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1") {
+    this.aiStopped = true;
+    this.game = new Chess(fen);
+    this.lastMove = null;
+    const initialState = createGameState(this.game);
+    this.state$.next(initialState);
+    this.aiStopped = false;
+    this.decideNextMove(initialState);
+  }
+
   set move(uci) {
     try {
       this.game.move(uci);

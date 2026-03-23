@@ -17,8 +17,16 @@
 
       <div id="player1-api" class="field mt-2 is-hidden">
         <label class="label has-text-white">White AI API URL</label>
-        <div class="control">
-          <input class="input" type="url" placeholder="https://jocasal-chessaithon.hf.space/predict">
+        <div class="field has-addons">
+          <div class="control is-expanded">
+            <input class="input" type="url" placeholder="https://jocasal-chessaithon.hf.space/predict">
+          </div>
+          <div class="control">
+            <button class="button is-info" type="button" data-preset-url="https://localhost:8443/predict" title="Use local server">Local</button>
+          </div>
+          <div class="control">
+            <button class="button is-primary" type="button" data-preset-url="https://jocasal-chessaithon.hf.space/predict" title="Use Hugging Face Space">HF</button>
+          </div>
         </div>
       </div>
     </div>
@@ -37,8 +45,16 @@
 
       <div id="player2-api" class="field mt-2 is-hidden">
         <label class="label has-text-white">Black AI API URL</label>
-        <div class="control">
-          <input class="input" type="url" placeholder="https://jocasal-chessaithon.hf.space/predict">
+        <div class="field has-addons">
+          <div class="control is-expanded">
+            <input class="input" type="url" placeholder="https://jocasal-chessaithon.hf.space/predict">
+          </div>
+          <div class="control">
+            <button class="button is-info" type="button" data-preset-url="https://localhost:8443/predict" title="Use local server">Local</button>
+          </div>
+          <div class="control">
+            <button class="button is-primary" type="button" data-preset-url="https://jocasal-chessaithon.hf.space/predict" title="Use Hugging Face Space">HF</button>
+          </div>
         </div>
       </div>
     </div>
@@ -52,12 +68,7 @@
           <input id="ai-simulations" class="input" type="number" min="1" max="10000" value="400" title="Number of MCTS simulations per AI decision. Higher values are usually stronger but slower.">
         </div>
       </div>
-      <div class="field mt-2">
-        <label class="label has-text-white" title="Exploration constant for MCTS. Lower values focus on best-known moves, higher values explore more.">PUCT</label>
-        <div class="control">
-          <input id="ai-puct" class="input" type="number" min="0.01" max="2.00" step="0.01" value="1.00" title="Exploration constant for MCTS. Lower values focus on best-known moves, higher values explore more.">
-        </div>
-      </div>
+     
       <div class="field mt-3">
         <label class="checkbox has-text-white" title="AI will suggest the top 5 moves and wait for the human to play one.">
           <input id="ai-suggest-only" type="checkbox" title="AI will suggest the top 5 moves and wait for the human to play one.">

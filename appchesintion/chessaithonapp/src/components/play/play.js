@@ -117,6 +117,14 @@ class PlayComponent extends HTMLElement {
         };
         this.addEventListener('startGame', this.handleStartGame);
 
+        // New game button
+        this.querySelector('#new_game').addEventListener('click', () => {
+            this.state.reset();
+            if (this.board) {
+                this.board.state.movesHistory.next([]);
+            }
+        });
+
         // Start game button http://10.100.22.119:8000/predict
     }
 
