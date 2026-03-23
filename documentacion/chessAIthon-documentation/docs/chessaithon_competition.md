@@ -29,6 +29,8 @@ Using a Jupyter Notebook and a GPU-enabled environment (local machine, Colab, or
 
 The result will be a trained model that can be shared on Kaggle and Hugging Face.
 
+https://www.kaggle.com/models/xxjcaxx/chessmarro?select=chessmarro_v9_final.pth
+
 https://www.kaggle.com/code/xxjcaxx/chessaithon-train
 
 ## Deploy your model
