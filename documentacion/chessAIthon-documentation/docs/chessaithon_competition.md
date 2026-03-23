@@ -20,11 +20,16 @@ This CSV must then be converted into the Parquet format required for AI training
 
 To make this step easier, a user-friendly Jupyter Notebook will be provided so each team can load its CSV and export the corresponding Parquet file.
 
+https://www.kaggle.com/code/xxjcaxx/chessaithon-convert
+
+
 ## Train your AI Chess Model
 
 Using a Jupyter Notebook and a GPU-enabled environment (local machine, Colab, or Kaggle), each team will fine-tune the provided base model with its own Parquet dataset.
 
 The result will be a trained model that can be shared on Kaggle and Hugging Face.
+
+https://www.kaggle.com/code/xxjcaxx/chessaithon-train
 
 ## Deploy your model
 
