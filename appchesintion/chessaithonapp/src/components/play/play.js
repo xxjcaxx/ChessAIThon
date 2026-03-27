@@ -3,15 +3,17 @@ import template from "./play.html?raw"
 import style from "./play.css?inline"
 import { Chess, validateFen } from 'chess.js'
 import { BehaviorSubject, Subject, fromEvent, map, filter, tap, merge, switchMap, of, throttleTime, asyncScheduler, concat, take, concatMap, distinctUntilChanged } from 'rxjs';
-import { uciToMove, chessPiecesUnicode, loadLocalStorage } from "../../chessUtils";
+import { uciToMove, chessPiecesUnicode, loadLocalStorage, decodeIdentificator } from "../../chessUtils";
 import { initStyle, initTemplate } from '../componentsUtils.js';
 import { GameState } from "../../services/chessGameService.js";
+import '../request_log/request_log.js';
 
 
 class PlayComponent extends HTMLElement {
 
     state = new GameState("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
     stateSubscription = null;
+    logSubscription = null;
     board = null;
     handleBoardMove = null;
     handlePlayersChanged = null;
@@ -19,6 +21,12 @@ class PlayComponent extends HTMLElement {
     handleAiToggleChanged = null;
  
     async connectedCallback() {
+        const identificator = this.identificator;
+        const fen = decodeIdentificator(identificator);
+        if (fen) {
+            this.state = new GameState(fen);
+        }
+
         this.state.resume();
 
         this.append(
@@ -52,6 +60,14 @@ class PlayComponent extends HTMLElement {
 
         const boardContainer = this.querySelector("#boardContainer");
         boardContainer.append(board);
+
+        // Wire request log component
+        const logComponent = this.querySelector('chess-request-log');
+        if (logComponent) {
+            this.logSubscription = this.state.requestLog$.subscribe(entry => {
+                logComponent.addEntry(entry);
+            });
+        }
 
         this.handleBoardMove = (e) => {
             const uci = e.detail.message;
@@ -134,6 +150,11 @@ class PlayComponent extends HTMLElement {
         if (this.stateSubscription) {
             this.stateSubscription.unsubscribe();
             this.stateSubscription = null;
+        }
+
+        if (this.logSubscription) {
+            this.logSubscription.unsubscribe();
+            this.logSubscription = null;
         }
 
         if (this.board && this.handleBoardMove) {

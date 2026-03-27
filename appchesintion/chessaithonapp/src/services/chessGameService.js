@@ -1,5 +1,5 @@
 import { Chess } from "chess.js";
-import { BehaviorSubject } from "rxjs";
+import { BehaviorSubject, Subject } from "rxjs";
 
 const createGameState = (game, lastMove, suggestedMoves = []) => {
   const ended = game.isGameOver();
@@ -76,6 +76,7 @@ export class GameState {
   constructor(fen) {
     this.game = new Chess(fen);
     this.state$ = new BehaviorSubject(createGameState(this.game));
+    this.requestLog$ = new Subject();
     this.aiStopped = false;
     //this.b = 'Human';
     //this.w = 'Human';
@@ -135,12 +136,25 @@ export class GameState {
       console.log("decide AI move", this.players);
       // this.game.move(newGameState.legalMoves[Math.floor(Math.random() * newGameState.legalMoves.length)]);
       // Use the shared request function; do not send mcts_tree for automated next-move decisions
+      const logEntry = {
+        fen: newGameState.fen,
+        turn: newGameState.currentPlayer,
+        timestamp: new Date(),
+        response: null,
+        problems: []
+      };
+
       requestAIMove({
         url: this.players[newGameState.currentPlayer + 'Api'],
         fen: newGameState.fen,
         simulations: this.settings?.simulations || 400,
         puct: this.settings?.puct || 1.0
       }).then(m => {
+        logEntry.response = m;
+        if (!m?.move) logEntry.problems.push('Server returned no move');
+        if (m?.error) logEntry.problems.push(`Server error: ${m.error}`);
+        this.requestLog$.next({ ...logEntry });
+
         if (this.aiStopped) {
           return;
         }
@@ -163,6 +177,8 @@ export class GameState {
         const aiMove = forceQueenPromotionIfNeeded(this.game, m?.move);
         this.move = aiMove;
       }).catch(err => {
+        logEntry.problems.push(err.message || 'Request failed');
+        this.requestLog$.next({ ...logEntry });
         if (!this.aiStopped) {
           console.error('AI request failed', err);
         }
