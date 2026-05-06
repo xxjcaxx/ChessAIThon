@@ -408,6 +408,45 @@ def number_to_uci(number_move):
 As we can see, it uses `codes`, the previous dictionary of moves.
 
 
+#### Conversion Trace for the Move "e2e4" to Index 820
+
+The move "e2e4" in UCI notation indicates that a piece moves from square e2 to square e4.
+1. Extraction of Coordinates and Calculation of Deltas
+First, we need to identify the origin and destination coordinates (file and rank), and calculate the difference or "delta" of this move:
+- Origin Square (from_square): e2.
+    - File (column) = 4 (column 'e').
+    - Rank (row) = 1 (row 2).
+- Destination Square (to_square): e4.
+    - File (column) = 4 (column 'e').
+    - Rank (row) = 3 (row 4).
+- Calculation of Deltas ($\Delta file$, $\Delta rank$):
+    - $\Delta file$ (horizontal change) = $4 \text{ (destination)} - 4 \text{ (origin)} = 0$.
+    - $\Delta rank$ (vertical change) = $3 \text{ (destination)} - 1 \text{ (origin)} = +2$.
+    - The move vector is: (dx, dy) = (0, +2). (This means 2 positions North).
+2. Determination of the Move Code (move_code)
+The move vector $(0, +2)$ must be mapped to a predefined numerical code, which corresponds to one of the 64 possible move types (56 for Queen moves in 8 directions and 8 for Knight moves).
+- Assuming the standard encoding used in the project, the move $(0, +2)$ (two squares North movement) is assigned a specific code.
+- In this example, it is established that codes[(0, 2)] = 12.
+- Therefore, move_code = 12.
+3. Construction of the Three-Dimensional (3D) Index
+The predicted position in the 4096 move space is internally visualized as a three-dimensional index in the form (move_code, flipped_rank, column), where the dimensions are $(64, 8, 8)$.
+- move_code: 12.
+- Flipped Rank (Origin flipped rank): Ranks are indexed from 0 (rank 8) to 7 (rank 1). The origin rank is 2 (rank 1).
+    - $7 - \text{rank}(\text{e}2) = 7 - 1 = \mathbf{6}$.
+- File (Origin Column): Column 'e' corresponds to index 4.
+- The 3D index is: (12, 6, 4).
+4. Conversion to the Flat Index (Index Flattening)
+Finally, the flattening formula is used to convert the 3D index into a single flat index between 0 and 4095:
+- Dimensions: $D = (64, 8, 8)$.
+- Index Formula: $index = (\text{move\_code} \times \text{dim}_2 \times \text{dim}_3) + (\text{rank} \times \text{dim}_3) + \text{file}$ (where rank and file are the inverted indices 6 and 4, and $dim_2$ and $dim_3$ are 8 and 8).
+    - Calculation:
+        - $\text{Index} = (12 \times 8 \times 8) + (6 \times 8) + 4$
+        - $\text{Index} = (12 \times 64) + 48 + 4$
+        - $\text{Index} = 768 + 48 + 4$
+        - $\text{Index} = \mathbf{820}$
+The move "e2e4" is successfully mapped to index 820. This unique index is the label that our CNN learns to predict during training, facilitating Deep Learning for chess decision-making.
+
+
 ## Training in a notebook
 
 
