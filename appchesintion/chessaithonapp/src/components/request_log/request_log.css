@@ -1,0 +1,66 @@
+/* Divider under the header inside the dark box */
+.log-header {
+  border-bottom: 1px solid #4a4a4a;
+}
+
+/* Scrollable entry list */
+.log-list {
+  max-height: 360px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #555 transparent;
+}
+.log-list::-webkit-scrollbar { width: 4px; }
+.log-list::-webkit-scrollbar-thumb { background: #555; border-radius: 2px; }
+
+/* Each entry row */
+.log-entry {
+  border-bottom: 1px solid #3a3a3a;
+}
+.log-entry:last-child { border-bottom: none; }
+
+.log-entry-header:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Expand arrow */
+.expand-icon {
+  transition: transform 0.15s;
+  flex-shrink: 0;
+}
+.log-entry.is-expanded .expand-icon {
+  transform: rotate(90deg);
+}
+
+/* Truncate FEN in the row */
+.log-fen-preview {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Collapsed body */
+.log-entry-body {
+  display: none;
+  background: rgba(0, 0, 0, 0.25);
+  border-top: 1px solid #3a3a3a;
+}
+.log-entry.is-expanded .log-entry-body {
+  display: block;
+}
+
+/* JSON response pre block */
+.log-pre {
+  background: rgba(0, 0, 0, 0.4);
+  color: #a8e6a4;
+  border: 1px solid #2a4a2a;
+  border-radius: 4px;
+  padding: 0.5rem 0.65rem;
+  max-height: 200px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  scrollbar-width: thin;
+  scrollbar-color: #555 transparent;
+}

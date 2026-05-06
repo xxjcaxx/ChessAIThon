@@ -10,8 +10,28 @@
         </div>
 
     </div>
-    <div id="players" class="column pt-6">
-        <chess-players></chess-players>
+    <div class="column pt-6 is-flex is-flex-direction-column" style="gap:1.25rem">
+        <div id="players">
+            <chess-players></chess-players>
+        </div>
+
+        <div id="instructions">
+            <div class="box has-background-dark" style="max-width:600px;margin:0 auto">
+                <h2 class="title is-6 has-text-white">ℹ️ How to play</h2>
+                <ul class="has-text-grey-light is-size-7" style="list-style:disc;padding-left:1.2rem;line-height:1.9">
+                    <li>Select <strong class="has-text-white">Human</strong> or <strong class="has-text-white">AI</strong> for each side.</li>
+                    <li>For AI players, enter the server URL or pick a preset (<em>Local</em> / <em>HF</em>).</li>
+                    <li>Adjust <strong class="has-text-white">Simulations</strong> to control AI strength vs. speed.</li>
+                    <li>Enable <strong class="has-text-white">Suggest moves only</strong> to see AI hints without auto-play.</li>
+                    <li>Press <strong class="has-text-white">Start Game</strong> to begin; use <strong class="has-text-white">Stop / Restart AI</strong> to pause or resume.</li>
+                    <li>Click <strong class="has-text-white">New Game</strong> to reset the board at any time.</li>
+                </ul>
+            </div>
+        </div>
+
+        <div id="log-panel">
+            <chess-request-log></chess-request-log>
+        </div>
     </div>
 </div>
  

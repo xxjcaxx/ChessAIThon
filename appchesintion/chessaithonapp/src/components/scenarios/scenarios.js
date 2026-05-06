@@ -60,7 +60,17 @@ const fensToRows = (rows) => {
       </td>
       <td data-move="${fen.move}">${createBestMoveSelector(fen.fen, fen.move)}</td>
       <td data-value="${fen.value}">${createInputValue(fen.value)}</td>
-      <td><span data-action="delete" data-fen="${fen.fen}">🗑</span><span data-action="representationLink" data-fen="${fen.fen}">🧊</span></td>`;
+      <td>
+        <span data-action="delete" data-fen="${fen.fen}" title="Delete scenario">
+          <img src="/trash.png" alt="Delete" class="scenario-action-icon" />
+        </span>
+        <span data-action="linktoplaysmall" data-fen="${fen.fen}" title="Open in play">
+          <img src="/linktoplay.png" alt="Play" class="scenario-action-icon" />
+        </span>
+        <span data-action="representationLink" data-fen="${fen.fen}" title="Open representation">
+          <img src="/matrixiconsmall.png" alt="Representation" class="scenario-action-icon" />
+        </span>
+      </td>`;
 
       row.querySelector("select").addEventListener("change", (event) => {
         const newMove = event.target.value;
@@ -210,18 +220,28 @@ class ScenariosComponent extends HTMLElement {
     });
 
     fromEvent(scenariosListDiv, "click").pipe(
-      filter(event => event.target.tagName === "SPAN" && event.target.dataset.action === "representationLink")
-    ).subscribe((event) => {
-      const fen = event.target.dataset.fen;
+      map(event => event.target.closest('span[data-action="representationLink"]')),
+      filter(Boolean)
+    ).subscribe((actionElement) => {
+      const fen = actionElement.dataset.fen;
       window.location.href = `#representation/${encodeURIComponent(fen)}`;
     });
 
     fromEvent(scenariosListDiv, "click").pipe(
-      filter(event => event.target.tagName === "SPAN" && event.target.dataset.action === "delete")
-    ).subscribe((event) => {
-      console.log("Borrar: ", event.target.dataset.fen);
+      map(event => event.target.closest('span[data-action="linktoplaysmall"]')),
+      filter(Boolean)
+    ).subscribe((actionElement) => {
+      const fen = actionElement.dataset.fen;
+      window.location.href = `#play/${encodeURIComponent(fen)}`;
+    });
+
+    fromEvent(scenariosListDiv, "click").pipe(
+      map(event => event.target.closest('span[data-action="delete"]')),
+      filter(Boolean)
+    ).subscribe((actionElement) => {
+      console.log("Borrar: ", actionElement.dataset.fen);
       const storedScenarios = this.state.storedScenarios.getValue();
-      const index = storedScenarios.findIndex(fen => fen.fen === event.target.dataset.fen);
+      const index = storedScenarios.findIndex(fen => fen.fen === actionElement.dataset.fen);
       if (index !== -1) {
         storedScenarios.splice(index, 1);
         this.state.storedScenarios.next(storedScenarios);
@@ -255,7 +275,7 @@ class ScenariosComponent extends HTMLElement {
       }).filter(row => validateFen(row.fen).ok);
       console.log(rows);
 
-      loadedscenariosListTableTbody.replaceChildren(...fensToRows([...rows]));
+      this.state.loadedScenarios.next([...rows]);
     };
 
 

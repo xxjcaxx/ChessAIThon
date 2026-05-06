@@ -89,3 +89,28 @@
   color: #4a4a4a;
   line-height: 1.45;
 }
+
+@media (max-width: 768px) {
+  .footer-columns {
+    text-align: center;
+  }
+
+  .footer-columns .column {
+    width: 100%;
+    padding-top: 0.35rem;
+    padding-bottom: 0.35rem;
+  }
+
+  .footer-columns .is-flex {
+    justify-content: center;
+  }
+
+  .footer-center-content {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .footer-center-content img {
+    margin-right: 0 !important;
+  }
+}
