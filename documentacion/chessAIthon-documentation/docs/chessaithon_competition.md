@@ -20,7 +20,8 @@ This CSV must then be converted into the Parquet format required for AI training
 
 To make this step easier, a user-friendly Jupyter Notebook will be provided so each team can load its CSV and export the corresponding Parquet file.
 
-https://www.kaggle.com/code/xxjcaxx/chessaithon-convert
+https://github.com/xxjcaxx/ChessAIThon/blob/master/training/convert_students.ipynb
+
 
 
 ## Train your AI Chess Model
@@ -31,14 +32,15 @@ The result will be a trained model that can be shared on Kaggle and Hugging Face
 
 https://www.kaggle.com/models/xxjcaxx/chessmarro?select=chessmarro_v9_final.pth
 
-https://www.kaggle.com/code/xxjcaxx/chessaithon-train
+https://github.com/xxjcaxx/ChessAIThon/blob/master/training/chessmarro20%20copy.ipynb
+
 
 ## Deploy your model
 
 
 On a GPU machine, a Docker setup with the MCTS engine adapted to our project will be available.
 
-Each team must place its fine-tuned model in the designated folder and run the following command to start the service:
+Each team must place its fine-tuned model in the designated folder. Then they have to change the name of the file in `chessmodel.py` and run the following command to start the service:
 
 ```bash
 docker compose down && docker compose up -d && docker compose logs -f
