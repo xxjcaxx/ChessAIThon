@@ -30,11 +30,11 @@ def get_model():
     if _model is None:
         with _model_lock:
             if _model is None:
-                print("Inicializando modelo (solo una vez en este proceso)...")
+                print("Stsarting model (Only one time in this process)...")
                 try:
                     _model, _device = init_model()
                 except Exception as e:
-                    print(f"Warning: no se pudo inicializar el modelo: {e}")
+                    print(f"Warning: Cant start model: {e}")
                     _model, _device = None, None
     return _model, _device
 
@@ -202,7 +202,7 @@ def main():
 
 def ensure_self_signed_certificate(cert_file: Path, key_file: Path):
     if cert_file.exists() and key_file.exists():
-        print(f"🔐 Certificado existente: {cert_file} / {key_file}")
+        print(f"🔐 Certificate Exists: {cert_file} / {key_file}")
         return
 
     cert_file.parent.mkdir(parents=True, exist_ok=True)
@@ -217,14 +217,14 @@ def ensure_self_signed_certificate(cert_file: Path, key_file: Path):
 
     try:
         subprocess.run(cmd, check=True, capture_output=True, text=True)
-        print(f"✅ Certificado autofirmado generado en {cert_file}")
+        print(f"✅ Autosigned Certificate in {cert_file}")
     except FileNotFoundError as exc:
         raise RuntimeError(
-            "No se encontró 'openssl'. Instálalo para generar certificados autofirmados."
+            "OpenSSL not found."
         ) from exc
     except subprocess.CalledProcessError as exc:
         raise RuntimeError(
-            f"Error generando certificado autofirmado: {exc.stderr.strip() or exc}"
+            f"Error generating self signed certificate: {exc.stderr.strip() or exc}"
         ) from exc
 
 
@@ -234,9 +234,9 @@ def run_http_and_https(api_app, http_port: int, https_port: int, cert_file: Path
 
     http_thread = threading.Thread(target=run_http, daemon=True)
     http_thread.start()
-    print(f"🌐 HTTP activo en http://0.0.0.0:{http_port}")
+    print(f"🌐 HTTP active in http://0.0.0.0:{http_port}")
 
-    print(f"🔒 HTTPS activo en https://0.0.0.0:{https_port}")
+    print(f"🔒 HTTPS active in https://0.0.0.0:{https_port}")
     uvicorn.run(
         api_app,
         host="0.0.0.0",
