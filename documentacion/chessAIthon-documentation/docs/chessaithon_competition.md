@@ -23,12 +23,18 @@ To make this step easier, a user-friendly Jupyter Notebook will be provided so e
 https://github.com/xxjcaxx/ChessAIThon/blob/master/training/convert_students.ipynb
 
 
-![](videos/chess.mp4)
+<video controls playsinline loop muted style="max-width:100%; height:auto;">
+	<source src="./videos/chess.mp4" type="video/mp4" />
+	Tu navegador no soporta la etiqueta de video.
+</video>
 
 
 ## Train your AI Chess Model
 
-![](videos/modeltrainchess.mp4)
+<video controls playsinline loop muted style="max-width:100%; height:auto;">
+	<source src="./videos/modeltrainchess.mp4" type="video/mp4" />
+	Tu navegador no soporta la etiqueta de video.
+</video>
 
 Using a Jupyter Notebook and a GPU-enabled environment (local machine, Colab, or Kaggle), each team will fine-tune the provided base model with its own Parquet dataset.
 
