@@ -24,7 +24,7 @@ https://github.com/xxjcaxx/ChessAIThon/blob/master/training/convert_students.ipy
 
 
 <video>
-	<source src="chess.mp4" type="video/mp4" />
+	<source src="/chess.mp4" type="video/mp4" />
 	Tu navegador no soporta la etiqueta de video.
 </video>
 
@@ -32,7 +32,7 @@ https://github.com/xxjcaxx/ChessAIThon/blob/master/training/convert_students.ipy
 ## Train your AI Chess Model
 
 <video>
-	<source src="modeltrainchess.mp4" type="video/mp4" />
+	<source src="/modeltrainchess.mp4" type="video/mp4" />
 	Tu navegador no soporta la etiqueta de video.
 </video>
 
