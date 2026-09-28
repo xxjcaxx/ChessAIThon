@@ -10,8 +10,6 @@ For each position, the team must define both:
 
 In order to do this you can use the `Chess Minds` application available in: https://chess-ai-thon.vercel.app/ 
 
-![]()
-
 ## Prepare data
 
 After playing, if multiple browsers were used, download all CSV files, merge them carefully without duplicating headers, and upload the result to GitHub.
@@ -25,8 +23,12 @@ To make this step easier, a user-friendly Jupyter Notebook will be provided so e
 https://github.com/xxjcaxx/ChessAIThon/blob/master/training/convert_students.ipynb
 
 
+![](videos/chess.mp4)
+
 
 ## Train your AI Chess Model
+
+![](videos/modeltrainchess.mp4)
 
 Using a Jupyter Notebook and a GPU-enabled environment (local machine, Colab, or Kaggle), each team will fine-tune the provided base model with its own Parquet dataset.
 
