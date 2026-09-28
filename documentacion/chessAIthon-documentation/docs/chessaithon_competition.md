@@ -10,6 +10,8 @@ For each position, the team must define both:
 
 In order to do this you can use the `Chess Minds` application available in: https://chess-ai-thon.vercel.app/ 
 
+![]()
+
 ## Prepare data
 
 After playing, if multiple browsers were used, download all CSV files, merge them carefully without duplicating headers, and upload the result to GitHub.
