@@ -23,7 +23,7 @@ To make this step easier, a user-friendly Jupyter Notebook will be provided so e
 https://github.com/xxjcaxx/ChessAIThon/blob/master/training/convert_students.ipynb
 
 
-<video>
+<video controls width="100%">
 	<source src="/ChessAIThon/chess.mp4" type="video/mp4" />
 	Tu navegador no soporta la etiqueta de video.
 </video>
@@ -31,7 +31,7 @@ https://github.com/xxjcaxx/ChessAIThon/blob/master/training/convert_students.ipy
 
 ## Train your AI Chess Model
 
-<video>
+<video controls width="100%">
 	<source src="/ChessAIThon/modeltrainchess.mp4" type="video/mp4" />
 	Tu navegador no soporta la etiqueta de video.
 </video>
