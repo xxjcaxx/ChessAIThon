@@ -11,7 +11,7 @@ sys.path.append("./chessintionlib")
 
 # --------------------------------------------------
 # Modify this file if you want to use other models
-model_PATH = "chessai.pth"
+model_PATH = "chessmarro_train_final.pth"
 # --------------------------------------------------
 
 
